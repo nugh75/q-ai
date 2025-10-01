@@ -2,25 +2,6 @@ import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import { Icons } from './Icons'
 
-// Funzione helper per determinare se usare grafico orizzontale
-const shouldUseHorizontalChart = (chartData, isMultipleChoice) => {
-  if (!chartData || chartData.length === 0) return false
-  
-  // Se è multiple choice, usa sempre orizzontale
-  if (isMultipleChoice) return true
-  
-  // Se ci sono più di 5 opzioni, usa orizzontale
-  if (chartData.length > 5) return true
-  
-  // Se le label sono lunghe (più di 25 caratteri), usa orizzontale
-  const hasLongLabels = chartData.some(item => {
-    const label = item.option || item.answer || item.range || ''
-    return label.length > 25
-  })
-  
-  return hasLongLabels
-}
-
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
 
 function QuestionStats({ question, teacherFilter }) {
@@ -91,126 +72,52 @@ function QuestionStats({ question, teacherFilter }) {
   const renderChart = () => {
     if (!stats.has_data) return null
 
-    let chartData = stats.distribution || []
+    const chartData = stats.distribution || []
     const isScaleQuestion = stats.question_info.response_format === 'scale_1_7'
     const isYesNoQuestion = stats.question_info.response_format === 'yes_no'
     const isNumericQuestion = stats.question_info.response_format === 'numeric'
     const isMultipleChoiceQuestion = stats.question_info.response_format === 'multiple_choice'
 
-    // Se ci sono troppe opzioni (più di 50), mostra solo le top 30 più frequenti
-    const MAX_OPTIONS_TO_DISPLAY = 30
-    const tooManyOptions = chartData.length > 50
-    let hiddenCount = 0
-    
-    if (tooManyOptions) {
-      // Ordina per count decrescente e prendi solo le prime 30
-      const sortedData = [...chartData].sort((a, b) => b.count - a.count)
-      hiddenCount = chartData.length - MAX_OPTIONS_TO_DISPLAY
-      chartData = sortedData.slice(0, MAX_OPTIONS_TO_DISPLAY)
-    }
-
     switch (selectedChart) {
       case 'bar':
-        // Determina se usare grafico orizzontale
-        const useHorizontal = shouldUseHorizontalChart(chartData, isMultipleChoiceQuestion)
-        const dataKey = isScaleQuestion ? "value" : (isYesNoQuestion ? "answer" : (isMultipleChoiceQuestion ? "option" : "range"))
+        // Calcola altezza dinamica in base al tipo di domanda
+        const barHeight = isMultipleChoiceQuestion ? 400 : 300
+        const hasLongLabels = isMultipleChoiceQuestion || (isYesNoQuestion && chartData.some(d => d.answer?.length > 20))
         
-        if (useHorizontal) {
-          // Grafico a barre ORIZZONTALI - etichetta a sinistra, barra al centro, valore a destra
-          const horizontalHeight = Math.max(400, chartData.length * 60)
-          
-          return (
-            <ResponsiveContainer width="100%" height={horizontalHeight}>
-              <BarChart 
-                data={chartData}
-                layout="horizontal"
-                margin={{ top: 20, right: 100, bottom: 40, left: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis 
-                  type="number"
-                  stroke="#64748b"
-                  style={{ fontSize: '0.875rem' }}
-                  allowDecimals={false}
-                  domain={[0, 'auto']}
-                />
-                <YAxis 
-                  type="category"
-                  dataKey={dataKey}
-                  stroke="#64748b"
-                  style={{ fontSize: '0.75rem' }}
-                  width={200}
-                  interval={0}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#ffffff', 
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
-                  }}
-                  wrapperStyle={{ zIndex: 1000 }}
-                />
-                <Bar 
-                  dataKey="count" 
-                  fill="#3b82f6"
-                  radius={[0, 8, 8, 0]}
-                  label={{ 
-                    position: 'right', 
-                    style: { fontSize: '0.875rem', fontWeight: 'bold' } 
-                  }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )
-        } else {
-          // Grafico a barre VERTICALI (per poche opzioni)
-          const barHeight = 300
-          const hasLongLabels = isYesNoQuestion && chartData.some(d => d.answer?.length > 20)
-          
-          return (
-            <ResponsiveContainer width="100%" height={barHeight}>
-              <BarChart 
-                data={chartData}
-                margin={{ top: 20, right: 30, bottom: hasLongLabels ? 120 : 50, left: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis 
-                  dataKey={dataKey}
-                  stroke="#64748b"
-                  style={{ fontSize: '0.75rem' }}
-                  angle={hasLongLabels ? -45 : 0}
-                  textAnchor={hasLongLabels ? "end" : "middle"}
-                  height={hasLongLabels ? 100 : 30}
-                  interval={0}
-                />
-                <YAxis 
-                  stroke="#64748b" 
-                  style={{ fontSize: '0.75rem' }}
-                  width={60}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#ffffff', 
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
-                  }}
-                  wrapperStyle={{ zIndex: 1000 }}
-                />
-                <Bar 
-                  dataKey="count" 
-                  fill="#3b82f6" 
-                  radius={[8, 8, 0, 0]}
-                  label={{ 
-                    position: 'top', 
-                    style: { fontSize: '0.875rem', fontWeight: 'bold' } 
-                  }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )
-        }
+        return (
+          <ResponsiveContainer width="100%" height={barHeight}>
+            <BarChart 
+              data={chartData}
+              margin={{ top: 20, right: 30, bottom: hasLongLabels ? 120 : 50, left: 20 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis 
+                dataKey={isScaleQuestion ? "value" : (isYesNoQuestion ? "answer" : (isMultipleChoiceQuestion ? "option" : "range"))} 
+                stroke="#64748b"
+                style={{ fontSize: '0.75rem' }}
+                angle={hasLongLabels ? -45 : 0}
+                textAnchor={hasLongLabels ? "end" : "middle"}
+                height={hasLongLabels ? 100 : 30}
+                interval={0}
+              />
+              <YAxis 
+                stroke="#64748b" 
+                style={{ fontSize: '0.75rem' }}
+                width={60}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#ffffff', 
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem'
+                }}
+                wrapperStyle={{ zIndex: 1000 }}
+              />
+              <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )
 
       case 'pie':
         if (isYesNoQuestion) {
