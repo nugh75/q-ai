@@ -36,9 +36,9 @@ class QuestionClassifier:
     
     # Parole chiave per determinare il formato di risposta
     SCALE_KEYWORDS = ['scala da', 'scala da']
-    YES_NO_KEYWORDS = ['utilizzi', 'insegni', 'attualmente insegni']
+    YES_NO_KEYWORDS = ['utilizzi', 'attualmente insegni']
     NUMERIC_KEYWORDS = ['quanti anni', 'quante ore']
-    MULTIPLE_CHOICE_KEYWORDS = ['seleziona tutte', 'puoi selezionare più opzioni', 'quali sono gli strumenti']
+    MULTIPLE_CHOICE_KEYWORDS = ['seleziona tutte', 'puoi selezionare più opzioni', 'quali sono gli strumenti', 'quale ordine', 'in quale ordine', 'che scuola', 'tipo di materia', 'settore scientifico']
     
     @staticmethod
     def classify_question(question_text: str) -> str:
@@ -127,8 +127,8 @@ class QuestionClassifier:
         """
         question_lower = question_text.lower()
         
-        # Demografiche (prime colonne)
-        if column_index <= 8 and any(word in question_lower for word in ['età', 'genere', 'scuola', 'titolo', 'studio', 'percorso', 'ordine', 'materia', 'settore']):
+        # Demografiche (prime colonne e domande specifiche)
+        if column_index <= 8 and any(word in question_lower for word in ['età', 'genere', 'scuola', 'titolo', 'studio', 'percorso', 'ordine', 'materia', 'settore', 'anni hai', 'attualmente insegni', 'professione docente']):
             return 'demographic'
         
         # Competenze

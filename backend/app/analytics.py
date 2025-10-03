@@ -89,12 +89,17 @@ class Analytics:
             'demographics': self._get_student_demographics(students)
         }
 
-    def get_teacher_statistics(self, include_non_teaching: bool = False) -> Dict[str, Any]:
+    def get_teacher_statistics(self, include_non_teaching: bool = False, only_non_teaching: bool = False) -> Dict[str, Any]:
         """Calcola statistiche per gli insegnanti"""
         query = self.db.query(TeacherResponse)
 
-        if not include_non_teaching:
+        if only_non_teaching:
+            # Solo insegnanti in formazione (che NON insegnano attualmente)
+            query = query.filter(TeacherResponse.currently_teaching != 'Attualmente insegno.')
+        elif not include_non_teaching:
+            # Solo insegnanti attivi
             query = query.filter(TeacherResponse.currently_teaching == 'Attualmente insegno.')
+        # Se include_non_teaching=True e only_non_teaching=False: tutti gli insegnanti
 
         teachers = query.all()
 
@@ -193,12 +198,18 @@ class Analytics:
             'demographics': self._get_teacher_demographics(teachers)
         }
 
-    def get_comparative_analysis(self) -> Dict[str, Any]:
+    def get_comparative_analysis(self, include_non_teaching: bool = False, only_non_teaching: bool = False) -> Dict[str, Any]:
         """Analisi comparativa tra studenti e insegnanti sulle domande speculari"""
         students = self.db.query(StudentResponse).all()
-        teachers = self.db.query(TeacherResponse).filter(
-            TeacherResponse.currently_teaching == 'Sì, insegno attualmente'
-        ).all()
+
+        # Filtra insegnanti in base ai parametri
+        teacher_query = self.db.query(TeacherResponse)
+        if only_non_teaching:
+            teacher_query = teacher_query.filter(TeacherResponse.currently_teaching != 'Attualmente insegno.')
+        elif not include_non_teaching:
+            teacher_query = teacher_query.filter(TeacherResponse.currently_teaching == 'Attualmente insegno.')
+
+        teachers = teacher_query.all()
 
         comparisons = []
 

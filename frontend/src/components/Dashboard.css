@@ -71,7 +71,7 @@
   box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.5);
 }
 
-.stat-label {
+.stat-card .stat-label {
   font-size: 0.75rem;
   opacity: 0.95;
   text-transform: uppercase;
@@ -80,7 +80,7 @@
   color: white;
 }
 
-.stat-value {
+.stat-card .stat-value {
   font-size: 2rem;
   font-weight: 700;
   color: white;
@@ -762,25 +762,25 @@
   letter-spacing: 0.5px;
 }
 
-.stat-value {
+.stats-grid .stat-value {
   font-size: 1.5rem;
   font-weight: 700;
   color: #1e293b;
 }
 
-.stat-value.primary {
+.stats-grid .stat-value.primary {
   color: #3b82f6;
 }
 
-.stat-value.success {
+.stats-grid .stat-value.success {
   color: #10b981;
 }
 
-.stat-value.warning {
+.stats-grid .stat-value.warning {
   color: #f59e0b;
 }
 
-.stat-value.danger {
+.stats-grid .stat-value.danger {
   color: #ef4444;
 }
 

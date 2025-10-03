@@ -2,15 +2,25 @@ import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
 import { Icons } from './Icons'
 import QuestionStats from './QuestionStats'
+import RespondentView from './RespondentView'
+import RespondentProfiles from './RespondentProfiles'
 import './Dashboard.css'
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
+
+// Colori per categorie di rispondenti
+const RESPONDENT_COLORS = {
+  student: '#3b82f6',
+  teacher_active: '#10b981',
+  teacher_training: '#f59e0b',
+  teacher: '#64748b'
+}
 
 function Dashboard({ data, onRefresh }) {
   const [activeTab, setActiveTab] = useState('questions')
   const [teacherFilter, setTeacherFilter] = useState('current')
   const [questionsData, setQuestionsData] = useState(null)
-  const [questionFilter, setQuestionFilter] = useState({ type: 'all', respondent: 'all', category: 'all' })
+  const [questionFilter, setQuestionFilter] = useState({ type: 'all', respondent: 'all', category: 'all', format: 'all' })
   const [expandedQuestions, setExpandedQuestions] = useState(new Set())
   const [overviewStats, setOverviewStats] = useState(null)
 
@@ -129,9 +139,17 @@ function Dashboard({ data, onRefresh }) {
       </header>
 
       <nav className="dashboard-nav">
+        <button className={activeTab === 'profiles' ? 'active' : ''} onClick={() => setActiveTab('profiles')}>
+          <Icons.Users className="w-5 h-5" />
+          Profili
+        </button>
         <button className={activeTab === 'questions' ? 'active' : ''} onClick={() => setActiveTab('questions')}>
           <Icons.Question className="w-5 h-5" />
           Domande
+        </button>
+        <button className={activeTab === 'respondents' ? 'active' : ''} onClick={() => setActiveTab('respondents')}>
+          <Icons.Search className="w-5 h-5" />
+          Rispondenti
         </button>
         <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>
           <Icons.Overview className="w-5 h-5" />
@@ -156,6 +174,10 @@ function Dashboard({ data, onRefresh }) {
       </nav>
 
       <main className="dashboard-content">
+        {activeTab === 'profiles' && <RespondentProfiles />}
+        
+        {activeTab === 'respondents' && <RespondentView />}
+        
         {activeTab === 'questions' && questionsData && (
           <div className="questions-tab">
             <section className="questions-header">
@@ -193,6 +215,17 @@ function Dashboard({ data, onRefresh }) {
                   <option value="all">Tutte</option>
                   <option value="open">Aperte</option>
                   <option value="closed">Chiuse</option>
+                </select>
+              </div>
+              <div className="filter-group">
+                <label>Formato risposta:</label>
+                <select value={questionFilter.format} onChange={(e) => setQuestionFilter({...questionFilter, format: e.target.value})}>
+                  <option value="all">Tutti i formati</option>
+                  <option value="scale_1_7">Scala Likert (1-7)</option>
+                  <option value="yes_no">Sì/No</option>
+                  <option value="multiple_choice">Scelta multipla</option>
+                  <option value="numeric">Numerica</option>
+                  <option value="text">Testo aperto</option>
                 </select>
               </div>
               <div className="filter-group">
@@ -236,12 +269,36 @@ function Dashboard({ data, onRefresh }) {
                   
                   return respondentMatch &&
                     (questionFilter.type === 'all' || q.question_type === questionFilter.type) &&
-                    (questionFilter.category === 'all' || q.category === questionFilter.category)
+                    (questionFilter.category === 'all' || q.category === questionFilter.category) &&
+                    (questionFilter.format === 'all' || q.response_format === questionFilter.format)
                 })
                 .map((q, idx) => {
                   const questionId = `${q.respondent_type}-${q.column_index}`
                   const isExpanded = expandedQuestions.has(questionId)
                   const hasStats = q.response_format !== 'text'
+                  
+                  // Determina etichetta e colore per rispondente
+                  let respondentLabel = 'Studenti'
+                  let respondentColor = RESPONDENT_COLORS.student
+                  let RespondentIcon = Icons.Student
+                  
+                  if (q.respondent_type === 'teacher') {
+                    RespondentIcon = Icons.Teacher
+                    if (questionFilter.respondent === 'teacher_active') {
+                      respondentLabel = 'Insegnanti Attivi'
+                      respondentColor = RESPONDENT_COLORS.teacher_active
+                    } else if (questionFilter.respondent === 'teacher_training') {
+                      respondentLabel = 'Insegnanti in Formazione'
+                      respondentColor = RESPONDENT_COLORS.teacher_training
+                    } else if (questionFilter.respondent === 'teacher') {
+                      respondentLabel = 'Insegnanti Totali'
+                      respondentColor = RESPONDENT_COLORS.teacher
+                    } else {
+                      // Se il filtro è "all", mostra solo "Insegnanti"
+                      respondentLabel = 'Insegnanti'
+                      respondentColor = RESPONDENT_COLORS.teacher
+                    }
+                  }
                   
                   return (
                     <div key={questionId} className={`question-card ${q.question_type}`}>
@@ -259,18 +316,16 @@ function Dashboard({ data, onRefresh }) {
                             </>
                           )}
                         </span>
-                        <span className="question-respondent">
-                          {q.respondent_type === 'student' ? (
-                            <>
-                              <Icons.Student className="w-4 h-4 inline" />
-                              {' '}Studenti
-                            </>
-                          ) : (
-                            <>
-                              <Icons.Teacher className="w-4 h-4 inline" />
-                              {' '}Insegnanti
-                            </>
-                          )}
+                        <span 
+                          className="question-respondent" 
+                          style={{ 
+                            backgroundColor: respondentColor + '20', 
+                            color: respondentColor,
+                            border: `1px solid ${respondentColor}`
+                          }}
+                        >
+                          <RespondentIcon className="w-4 h-4 inline" />
+                          {' '}{respondentLabel}
                         </span>
                         <span className="question-category">
                           <Icons.Category className="w-3 h-3 inline" />

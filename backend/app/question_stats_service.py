@@ -31,6 +31,7 @@ class QuestionStatsService:
         15: 'uses_ai_daily',
         16: 'hours_daily',
         18: 'uses_ai_study',
+        19: 'hours_daily',  # Quante ore alla settimana per attività quotidiane (usa stesso campo di col 16)
         20: 'hours_study',
         21: 'hours_learning_tools',
         22: 'hours_saved',
@@ -145,21 +146,32 @@ class QuestionStatsService:
         mean = statistics.mean(values)
         median = statistics.median(values)
         stdev = statistics.stdev(values) if len(values) > 1 else 0
-        
+
+        # Calcola quartili e outliers per box plot
+        sorted_values = sorted(values)
+        q1 = statistics.quantiles(sorted_values, n=4)[0] if len(sorted_values) >= 4 else min(sorted_values)
+        q3 = statistics.quantiles(sorted_values, n=4)[2] if len(sorted_values) >= 4 else max(sorted_values)
+        iqr = q3 - q1
+        lower_fence = q1 - 1.5 * iqr
+        upper_fence = q3 + 1.5 * iqr
+
+        # Identifica outliers
+        outliers = [v for v in values if v < lower_fence or v > upper_fence]
+
         # Distribuzione
         distribution = Counter(values)
         distribution_data = [
             {"value": i, "count": distribution.get(i, 0)}
             for i in range(1, 8)
         ]
-        
+
         # Percentuali
         total = len(values)
         distribution_percentage = [
             {"value": i, "percentage": round((distribution.get(i, 0) / total) * 100, 2)}
             for i in range(1, 8)
         ]
-        
+
         return {
             "question_info": question_info,
             "has_data": True,
@@ -170,11 +182,22 @@ class QuestionStatsService:
                 "std_dev": round(stdev, 2),
                 "min": min(values),
                 "max": max(values),
-                "mode": statistics.mode(values) if len(set(values)) < len(values) else None
+                "mode": statistics.mode(values) if len(set(values)) < len(values) else None,
+                "q1": round(q1, 2),
+                "q3": round(q3, 2),
+                "iqr": round(iqr, 2)
+            },
+            "boxplot_data": {
+                "min": round(min([v for v in values if v >= lower_fence]), 2) if any(v >= lower_fence for v in values) else round(min(values), 2),
+                "q1": round(q1, 2),
+                "median": round(median, 2),
+                "q3": round(q3, 2),
+                "max": round(max([v for v in values if v <= upper_fence]), 2) if any(v <= upper_fence for v in values) else round(max(values), 2),
+                "outliers": [round(o, 2) for o in outliers]
             },
             "distribution": distribution_data,
             "distribution_percentage": distribution_percentage,
-            "chart_types": ["bar", "pie", "line"],
+            "chart_types": ["bar", "pie", "line", "boxplot"],
             "recommended_chart": "bar"
         }
     
@@ -182,34 +205,45 @@ class QuestionStatsService:
         """Statistiche per domande numeriche (età, ore)"""
         Model = StudentResponse if respondent_type == 'student' else TeacherResponse
         field = getattr(Model, field_name)
-        
+
         query = self.db.query(field).filter(field.isnot(None))
-        
+
         # Applica filtro per tipo insegnante se specificato
         if respondent_type == 'teacher' and teacher_type:
             if teacher_type == 'active':
                 query = query.filter(TeacherResponse.currently_teaching == 'Attualmente insegno.')
             elif teacher_type == 'training':
                 query = query.filter(TeacherResponse.currently_teaching == 'Ancora non insegno, ma sto seguendo o ho concluso un percorso PEF (Percorso di formazione iniziale degli insegnanti).')
-        
+
         values = query.all()
         values = [v[0] for v in values if v[0] is not None and v[0] > 0]
-        
+
         if not values:
             return {
                 "question_info": question_info,
                 "has_data": False,
                 "message": "No responses for this question"
             }
-        
+
         mean = statistics.mean(values)
         median = statistics.median(values)
         stdev = statistics.stdev(values) if len(values) > 1 else 0
-        
+
+        # Calcola quartili e outliers per box plot
+        sorted_values = sorted(values)
+        q1 = statistics.quantiles(sorted_values, n=4)[0] if len(sorted_values) >= 4 else min(sorted_values)
+        q3 = statistics.quantiles(sorted_values, n=4)[2] if len(sorted_values) >= 4 else max(sorted_values)
+        iqr = q3 - q1
+        lower_fence = q1 - 1.5 * iqr
+        upper_fence = q3 + 1.5 * iqr
+
+        # Identifica outliers
+        outliers = [v for v in values if v < lower_fence or v > upper_fence]
+
         # Crea range per distribuzione
         min_val = min(values)
         max_val = max(values)
-        
+
         # Distribuzione in gruppi
         if max_val - min_val <= 20:
             # Valori discreti
@@ -223,17 +257,19 @@ class QuestionStatsService:
             num_bins = 10
             bin_size = (max_val - min_val) / num_bins
             bins = {}
+            bin_indices = {}  # Memorizza l'indice per ordinamento corretto
             for v in values:
                 bin_idx = min(int((v - min_val) / bin_size), num_bins - 1)
                 bin_start = min_val + bin_idx * bin_size
                 bin_key = f"{int(bin_start)}-{int(bin_start + bin_size)}"
                 bins[bin_key] = bins.get(bin_key, 0) + 1
-            
+                bin_indices[bin_key] = bin_start
+
             distribution_data = [
-                {"range": k, "count": v}
-                for k, v in sorted(bins.items())
+                {"range": k, "count": bins[k]}
+                for k in sorted(bins.keys(), key=lambda x: bin_indices[x])
             ]
-        
+
         return {
             "question_info": question_info,
             "has_data": True,
@@ -243,10 +279,21 @@ class QuestionStatsService:
                 "median": round(median, 2),
                 "std_dev": round(stdev, 2),
                 "min": round(min(values), 2),
-                "max": round(max(values), 2)
+                "max": round(max(values), 2),
+                "q1": round(q1, 2),
+                "q3": round(q3, 2),
+                "iqr": round(iqr, 2)
+            },
+            "boxplot_data": {
+                "min": round(min([v for v in values if v >= lower_fence]), 2) if any(v >= lower_fence for v in values) else round(min(values), 2),
+                "q1": round(q1, 2),
+                "median": round(median, 2),
+                "q3": round(q3, 2),
+                "max": round(max([v for v in values if v <= upper_fence]), 2) if any(v <= upper_fence for v in values) else round(max(values), 2),
+                "outliers": [round(o, 2) for o in outliers]
             },
             "distribution": distribution_data,
-            "chart_types": ["bar", "line", "histogram"],
+            "chart_types": ["bar", "line", "histogram", "boxplot"],
             "recommended_chart": "histogram"
         }
     
@@ -318,6 +365,11 @@ class QuestionStatsService:
         
         values = query.all()
         values = [v[0] for v in values if v[0] is not None and v[0].strip() != '']
+        
+        # Normalizza school_level se è il campo richiesto
+        if field_name == 'school_level':
+            from .main import normalize_school_level
+            values = [normalize_school_level(v) for v in values]
         
         if not values:
             return {

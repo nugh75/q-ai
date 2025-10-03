@@ -1,38 +1,47 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15-alpine
     container_name: questionnaire_db
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: questionnaire_db
+      POSTGRES_USER: ${DB_USER:-user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-questionnaire_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5433}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d questionnaire_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-user} -d ${DB_NAME:-questionnaire_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - questionnaire-net
+    restart: unless-stopped
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: questionnaire_backend
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://user:password@db:5432/questionnaire_db
+      DATABASE_URL: postgresql://${DB_USER:-user}:${DB_PASSWORD:-password}@db:5432/${DB_NAME:-questionnaire_db}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5180,http://localhost:5173}
+      CACHE_TTL: ${CACHE_TTL:-3600}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-10}
     volumes:
       - ./backend:/app
       - ./dati:/app/dati
     ports:
-      - "8118:8000"
+      - "${BACKEND_PORT:-8118}:8000"
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - questionnaire-net
+    restart: unless-stopped
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
@@ -40,16 +49,25 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: questionnaire_frontend
+    env_file:
+      - .env
     environment:
-      VITE_API_URL: http://192.168.129.14:8118
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8118}
     volumes:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "5180:5173"
+      - "${FRONTEND_PORT:-5180}:5173"
     depends_on:
       - backend
+    networks:
+      - questionnaire-net
+    restart: unless-stopped
     command: npm run dev -- --host
+
+networks:
+  questionnaire-net:
+    driver: bridge
 
 volumes:
   postgres_data:

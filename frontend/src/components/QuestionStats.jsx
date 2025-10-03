@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import { Icons } from './Icons'
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
 
 function QuestionStats({ question, teacherFilter }) {
   const [stats, setStats] = useState(null)
@@ -10,17 +11,13 @@ function QuestionStats({ question, teacherFilter }) {
   const [error, setError] = useState(null)
   const [selectedChart, setSelectedChart] = useState('bar')
 
-  useEffect(() => {
-    fetchStats()
-  }, [question, teacherFilter])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       // Costruisci URL con filtro per insegnanti
-      let url = `http://localhost:8118/api/questions/${question.respondent_type}/${question.column_index}/stats`
-      
+      let url = `${API_URL}/api/questions/${question.respondent_type}/${question.column_index}/stats`
+
       // Se è una domanda insegnanti e abbiamo un filtro specifico
       if (question.respondent_type === 'teacher' && teacherFilter) {
         if (teacherFilter === 'teacher_active') {
@@ -30,10 +27,10 @@ function QuestionStats({ question, teacherFilter }) {
         }
         // 'teacher' o 'all' = tutti gli insegnanti (default)
       }
-      
+
       const response = await fetch(url)
       const data = await response.json()
-      
+
       if (data.has_data) {
         setStats(data)
         setSelectedChart(data.recommended_chart || 'bar')
@@ -46,7 +43,11 @@ function QuestionStats({ question, teacherFilter }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [question.respondent_type, question.column_index, teacherFilter])
+
+  useEffect(() => {
+    fetchStats()
+  }, [fetchStats])
 
   if (loading) {
     return (
@@ -75,36 +76,62 @@ function QuestionStats({ question, teacherFilter }) {
     const chartData = stats.distribution || []
     const isScaleQuestion = stats.question_info.response_format === 'scale_1_7'
     const isYesNoQuestion = stats.question_info.response_format === 'yes_no'
-    const isNumericQuestion = stats.question_info.response_format === 'numeric'
     const isMultipleChoiceQuestion = stats.question_info.response_format === 'multiple_choice'
 
     switch (selectedChart) {
-      case 'bar':
+      case 'bar': {
         // Calcola altezza dinamica in base al tipo di domanda
-        const barHeight = isMultipleChoiceQuestion ? 400 : 300
         const hasLongLabels = isMultipleChoiceQuestion || (isYesNoQuestion && chartData.some(d => d.answer?.length > 20))
+        const hasManyCols = chartData.length > 6
+        const useVerticalLayout = hasManyCols
+        
+        // Altezza dinamica: per layout verticale dipende dal numero di elementi
+        const barHeight = useVerticalLayout ? Math.max(400, chartData.length * 50) : (isMultipleChoiceQuestion ? 400 : 300)
+        
+        const dataKey = isScaleQuestion ? "value" : (isYesNoQuestion ? "answer" : (isMultipleChoiceQuestion ? "option" : "range"))
         
         return (
           <ResponsiveContainer width="100%" height={barHeight}>
             <BarChart 
               data={chartData}
-              margin={{ top: 20, right: 30, bottom: hasLongLabels ? 120 : 50, left: 20 }}
+              layout={useVerticalLayout ? "vertical" : "horizontal"}
+              margin={{ top: 20, right: 30, bottom: useVerticalLayout ? 50 : (hasLongLabels ? 120 : 50), left: useVerticalLayout ? 200 : 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis 
-                dataKey={isScaleQuestion ? "value" : (isYesNoQuestion ? "answer" : (isMultipleChoiceQuestion ? "option" : "range"))} 
-                stroke="#64748b"
-                style={{ fontSize: '0.75rem' }}
-                angle={hasLongLabels ? -45 : 0}
-                textAnchor={hasLongLabels ? "end" : "middle"}
-                height={hasLongLabels ? 100 : 30}
-                interval={0}
-              />
-              <YAxis 
-                stroke="#64748b" 
-                style={{ fontSize: '0.75rem' }}
-                width={60}
-              />
+              {useVerticalLayout ? (
+                <>
+                  <XAxis 
+                    type="number"
+                    stroke="#64748b"
+                    style={{ fontSize: '0.75rem' }}
+                  />
+                  <YAxis 
+                    type="category"
+                    dataKey={dataKey}
+                    stroke="#64748b" 
+                    style={{ fontSize: '0.75rem' }}
+                    width={180}
+                    interval={0}
+                  />
+                </>
+              ) : (
+                <>
+                  <XAxis 
+                    dataKey={dataKey}
+                    stroke="#64748b"
+                    style={{ fontSize: '0.75rem' }}
+                    angle={hasLongLabels ? -45 : 0}
+                    textAnchor={hasLongLabels ? "end" : "middle"}
+                    height={hasLongLabels ? 100 : 30}
+                    interval={0}
+                  />
+                  <YAxis 
+                    stroke="#64748b" 
+                    style={{ fontSize: '0.75rem' }}
+                    width={60}
+                  />
+                </>
+              )}
               <Tooltip 
                 contentStyle={{ 
                   backgroundColor: '#ffffff', 
@@ -114,12 +141,13 @@ function QuestionStats({ question, teacherFilter }) {
                 }}
                 wrapperStyle={{ zIndex: 1000 }}
               />
-              <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="count" fill="#3b82f6" radius={useVerticalLayout ? [0, 8, 8, 0] : [8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )
+      }
 
-      case 'pie':
+      case 'pie': {
         if (isYesNoQuestion) {
           const pieData = chartData.map(item => ({
             name: item.answer,
@@ -133,7 +161,7 @@ function QuestionStats({ question, teacherFilter }) {
                   cx="50%"
                   cy="45%"
                   labelLine={true}
-                  label={({ name, percent }) => `${(percent * 100).toFixed(1)}%`}
+                  label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
                   outerRadius={90}
                   fill="#8884d8"
                   dataKey="value"
@@ -174,7 +202,7 @@ function QuestionStats({ question, teacherFilter }) {
                   cx="50%"
                   cy="45%"
                   labelLine={true}
-                  label={({ name, percent }) => `${(percent * 100).toFixed(1)}%`}
+                  label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
                   outerRadius={90}
                   fill="#8884d8"
                   dataKey="value"
@@ -251,8 +279,9 @@ function QuestionStats({ question, teacherFilter }) {
           )
         }
         return <p className="text-center text-sm text-gray-500">Grafico a torta non disponibile per questo tipo di dati</p>
+      }
 
-      case 'line':
+      case 'line': {
         return (
           <ResponsiveContainer width="100%" height={300}>
             <LineChart 
@@ -291,42 +320,154 @@ function QuestionStats({ question, teacherFilter }) {
             </LineChart>
           </ResponsiveContainer>
         )
+      }
 
-      case 'histogram':
+      case 'histogram': {
+        const hasManyCols = chartData.length > 6
+        const useVerticalLayout = hasManyCols
+        const histHeight = useVerticalLayout ? Math.max(400, chartData.length * 50) : 350
+        
         return (
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart 
+          <ResponsiveContainer width="100%" height={histHeight}>
+            <BarChart
               data={chartData}
-              margin={{ top: 20, right: 30, bottom: 100, left: 20 }}
+              layout={useVerticalLayout ? "vertical" : "horizontal"}
+              margin={{ top: 20, right: 30, bottom: useVerticalLayout ? 50 : 100, left: useVerticalLayout ? 150 : 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis 
-                dataKey="range" 
-                stroke="#64748b"
-                style={{ fontSize: '0.75rem' }}
-                angle={-45}
-                textAnchor="end"
-                height={80}
-                interval={0}
-              />
-              <YAxis 
-                stroke="#64748b" 
-                style={{ fontSize: '0.75rem' }}
-                width={60}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#ffffff', 
+              {useVerticalLayout ? (
+                <>
+                  <XAxis
+                    type="number"
+                    stroke="#64748b"
+                    style={{ fontSize: '0.75rem' }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="range"
+                    stroke="#64748b"
+                    style={{ fontSize: '0.75rem' }}
+                    width={130}
+                    interval={0}
+                  />
+                </>
+              ) : (
+                <>
+                  <XAxis
+                    dataKey="range"
+                    stroke="#64748b"
+                    style={{ fontSize: '0.75rem' }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    interval={0}
+                  />
+                  <YAxis
+                    stroke="#64748b"
+                    style={{ fontSize: '0.75rem' }}
+                    width={60}
+                  />
+                </>
+              )}
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#ffffff',
                   border: '1px solid #e2e8f0',
                   borderRadius: '0.5rem',
                   fontSize: '0.875rem'
                 }}
                 wrapperStyle={{ zIndex: 1000 }}
               />
-              <Bar dataKey="count" fill="#10b981" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="count" fill="#10b981" radius={useVerticalLayout ? [0, 8, 8, 0] : [8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )
+      }
+
+      case 'boxplot': {
+        if (!stats.boxplot_data) return <p className="text-center text-sm text-gray-500">Dati box plot non disponibili</p>
+
+        const boxData = stats.boxplot_data
+        const padding = 50
+        const boxWidth = 80
+        const height = 400
+        const width = 500
+
+        // Calcola scala Y
+        const dataMin = Math.min(boxData.min, ...(boxData.outliers || []))
+        const dataMax = Math.max(boxData.max, ...(boxData.outliers || []))
+        const range = dataMax - dataMin
+        const yMin = dataMin - range * 0.1
+        const yMax = dataMax + range * 0.1
+        const yScale = (value) => height - padding - ((value - yMin) / (yMax - yMin)) * (height - 2 * padding)
+
+        const centerX = 150
+
+        return (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
+            <svg width={width} height={height} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
+              {/* Griglia orizzontale */}
+              {[0, 0.25, 0.5, 0.75, 1].map((fraction, i) => {
+                const value = yMin + fraction * (yMax - yMin)
+                const y = yScale(value)
+                return (
+                  <g key={i}>
+                    <line x1={padding - 10} y1={y} x2={centerX + boxWidth / 2 + 20} y2={y} stroke="#e2e8f0" strokeDasharray="3 3" />
+                    <text x={padding - 15} y={y + 4} textAnchor="end" fontSize="10" fill="#64748b">{value.toFixed(1)}</text>
+                  </g>
+                )
+              })}
+
+              {/* Linea min-Q1 (whisker inferiore) */}
+              <line x1={centerX} y1={yScale(boxData.min)} x2={centerX} y2={yScale(boxData.q1)} stroke="#3b82f6" strokeWidth={2} />
+              <line x1={centerX - 15} y1={yScale(boxData.min)} x2={centerX + 15} y2={yScale(boxData.min)} stroke="#3b82f6" strokeWidth={2} />
+
+              {/* Box (Q1-Q3) */}
+              <rect
+                x={centerX - boxWidth / 2}
+                y={yScale(boxData.q3)}
+                width={boxWidth}
+                height={yScale(boxData.q1) - yScale(boxData.q3)}
+                fill="#dbeafe"
+                stroke="#3b82f6"
+                strokeWidth={2}
+              />
+
+              {/* Mediana */}
+              <line
+                x1={centerX - boxWidth / 2}
+                y1={yScale(boxData.median)}
+                x2={centerX + boxWidth / 2}
+                y2={yScale(boxData.median)}
+                stroke="#ef4444"
+                strokeWidth={3}
+              />
+
+              {/* Linea Q3-max (whisker superiore) */}
+              <line x1={centerX} y1={yScale(boxData.q3)} x2={centerX} y2={yScale(boxData.max)} stroke="#3b82f6" strokeWidth={2} />
+              <line x1={centerX - 15} y1={yScale(boxData.max)} x2={centerX + 15} y2={yScale(boxData.max)} stroke="#3b82f6" strokeWidth={2} />
+
+              {/* Outliers */}
+              {(boxData.outliers || []).map((outlier, i) => (
+                <circle key={i} cx={centerX} cy={yScale(outlier)} r={4} fill="#f59e0b" stroke="#d97706" strokeWidth={1} />
+              ))}
+
+              {/* Legenda valori */}
+              <g transform={`translate(${centerX + boxWidth / 2 + 40}, ${padding})`}>
+                <text y={0} fontSize="11" fontWeight="600" fill="#1e293b">Valori:</text>
+                <text y={20} fontSize="10" fill="#64748b">Max: {boxData.max}</text>
+                <text y={35} fontSize="10" fill="#64748b">Q3: {boxData.q3}</text>
+                <text y={50} fontSize="10" fill="#ef4444">Med: {boxData.median}</text>
+                <text y={65} fontSize="10" fill="#64748b">Q1: {boxData.q1}</text>
+                <text y={80} fontSize="10" fill="#64748b">Min: {boxData.min}</text>
+                {boxData.outliers && boxData.outliers.length > 0 && (
+                  <text y={100} fontSize="10" fill="#f59e0b">Outliers: {boxData.outliers.length}</text>
+                )}
+              </g>
+            </svg>
+          </div>
+        )
+      }
 
       default:
         return null
@@ -372,6 +513,24 @@ function QuestionStats({ question, teacherFilter }) {
           <div className="stat-item">
             <span className="stat-label">Moda</span>
             <span className="stat-value">{statsList.mode}</span>
+          </div>
+        )}
+        {statsList.q1 !== undefined && (
+          <div className="stat-item">
+            <span className="stat-label">Q1 (25%)</span>
+            <span className="stat-value">{statsList.q1}</span>
+          </div>
+        )}
+        {statsList.q3 !== undefined && (
+          <div className="stat-item">
+            <span className="stat-label">Q3 (75%)</span>
+            <span className="stat-value">{statsList.q3}</span>
+          </div>
+        )}
+        {statsList.iqr !== undefined && (
+          <div className="stat-item">
+            <span className="stat-label">IQR</span>
+            <span className="stat-value">{statsList.iqr}</span>
           </div>
         )}
         {statsList.yes_percentage !== undefined && (
@@ -443,6 +602,7 @@ function QuestionStats({ question, teacherFilter }) {
                 {type === 'pie' && 'Torta'}
                 {type === 'line' && 'Linea'}
                 {type === 'histogram' && 'Istogramma'}
+                {type === 'boxplot' && 'Box Plot'}
               </button>
             ))}
           </div>
