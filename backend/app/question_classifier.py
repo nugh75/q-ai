@@ -38,7 +38,10 @@ class QuestionClassifier:
     SCALE_KEYWORDS = ['scala da', 'scala da']
     YES_NO_KEYWORDS = ['utilizzi', 'attualmente insegni']
     NUMERIC_KEYWORDS = ['quanti anni', 'quante ore']
-    MULTIPLE_CHOICE_KEYWORDS = ['seleziona tutte', 'puoi selezionare più opzioni', 'quali sono gli strumenti', 'quale ordine', 'in quale ordine', 'che scuola', 'tipo di materia', 'settore scientifico']
+    # Nota: settore scientifico-disciplinare è multiple_choice perché gli insegnanti possono avere più classi di concorso
+    MULTIPLE_CHOICE_KEYWORDS = ['seleziona tutte', 'puoi selezionare più opzioni', 'quali sono gli strumenti', 'quale ordine', 'in quale ordine', 'che scuola', 'settore scientifico-disciplinare']
+    # Domande a scelta singola (non dividere per virgole)
+    SINGLE_CHOICE_KEYWORDS = ['insegna (o insegnerà) una materia', 'tipo di materia']
     
     @staticmethod
     def classify_question(question_text: str) -> str:
@@ -101,6 +104,10 @@ class QuestionClassifier:
         # Numerico (età, ore)
         if any(keyword in question_lower for keyword in QuestionClassifier.NUMERIC_KEYWORDS):
             return 'numeric'
+        
+        # Single choice (scelta singola, non dividere per virgole)
+        if any(keyword in question_lower for keyword in QuestionClassifier.SINGLE_CHOICE_KEYWORDS):
+            return 'single_choice'
         
         # Multiple choice
         if any(keyword in question_lower for keyword in QuestionClassifier.MULTIPLE_CHOICE_KEYWORDS):

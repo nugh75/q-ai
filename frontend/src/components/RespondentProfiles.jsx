@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Scatter, Line } from 'recharts'
 import { Icons } from './Icons'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
@@ -197,7 +197,7 @@ function RespondentProfiles() {
         </ResponsiveContainer>
       </section>
 
-      {/* Confronto Età */}
+      {/* Confronto Età con Box Plot */}
       <section style={{
         backgroundColor: 'white',
         padding: '25px',
@@ -206,18 +206,104 @@ function RespondentProfiles() {
         marginBottom: '25px'
       }}>
         <h3 style={{ marginBottom: '20px', color: '#334155' }}>
-          Confronto Età Media
+          Confronto Età Media con Outliers (Box Plot)
         </h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={ageData}>
+        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '6px', display: 'flex', gap: '10px' }}>
+          <Icons.Info className="w-5 h-5" style={{ color: '#3b82f6', flexShrink: 0, marginTop: '2px' }} />
+          <p style={{ fontSize: '0.9em', color: '#64748b', margin: 0 }}>
+            Il box plot mostra la distribuzione dell'età: la barra blu è la media, le linee grigie rappresentano il range min-max.
+            Viene mostrato un report dettagliato sugli outliers (valori anomali) sotto il grafico.
+          </p>
+        </div>
+        <ResponsiveContainer width="100%" height={350}>
+          <ComposedChart data={ageData} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="category" />
-            <YAxis />
-            <Tooltip />
+            <YAxis domain={[0, 'auto']} label={{ value: 'Età', angle: -90, position: 'insideLeft' }} />
+            <Tooltip content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload
+                return (
+                  <div style={{ backgroundColor: 'white', padding: '12px', border: '1px solid #ccc', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+                    <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', color: '#1e40af' }}>{data.category}</p>
+                    <p style={{ margin: '4px 0', fontSize: '0.9em' }}>Età Media: <strong>{data.avg}</strong></p>
+                    <p style={{ margin: '4px 0', fontSize: '0.9em' }}>Età Min: <strong>{data.min}</strong></p>
+                    <p style={{ margin: '4px 0', fontSize: '0.9em' }}>Età Max: <strong>{data.max}</strong></p>
+                    <p style={{ margin: '4px 0', fontSize: '0.9em' }}>Range: <strong>{data.max - data.min}</strong> anni</p>
+                  </div>
+                )
+              }
+              return null
+            }} />
             <Legend />
-            <Bar dataKey="avg" fill="#3b82f6" name="Età Media" />
-          </BarChart>
+            {/* Linee per min e max */}
+            <Line type="monotone" dataKey="min" stroke="#94a3b8" strokeWidth={2} name="Min" dot={{ r: 4 }} />
+            <Line type="monotone" dataKey="max" stroke="#94a3b8" strokeWidth={2} name="Max" dot={{ r: 4 }} />
+            {/* Barre per mostrare la media */}
+            <Bar dataKey="avg" fill="#3b82f6" name="Età Media" barSize={40} />
+          </ComposedChart>
         </ResponsiveContainer>
+
+        {/* Report Outliers */}
+        <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa' }}>
+          <h4 style={{ margin: '0 0 15px 0', color: '#9a3412', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Icons.AlertCircle className="w-5 h-5" />
+            Analisi Outliers (Valori Anomali)
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
+            {ageData.map((group, idx) => {
+              const mean = group.avg
+              const range = group.max - group.min
+              const iqr = range * 0.5 // Stima approssimativa dell'IQR
+              const lowerBound = mean - (1.5 * iqr)
+              const upperBound = mean + (1.5 * iqr)
+              const hasLowerOutliers = group.min < lowerBound
+              const hasUpperOutliers = group.max > upperBound
+              const hasOutliers = hasLowerOutliers || hasUpperOutliers
+
+              return (
+                <div key={idx} style={{
+                  padding: '15px',
+                  backgroundColor: hasOutliers ? '#fef2f2' : '#f0fdf4',
+                  borderRadius: '6px',
+                  border: `2px solid ${hasOutliers ? '#fca5a5' : '#86efac'}`
+                }}>
+                  <div style={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {hasOutliers ? (
+                      <Icons.Warning className="w-4 h-4" style={{ color: '#dc2626' }} />
+                    ) : (
+                      <Icons.Check className="w-4 h-4" style={{ color: '#16a34a' }} />
+                    )}
+                    {group.category}
+                  </div>
+                  <div style={{ fontSize: '0.85em', color: '#475569', lineHeight: '1.6' }}>
+                    <p style={{ margin: '5px 0' }}>Media: <strong>{mean}</strong> anni</p>
+                    <p style={{ margin: '5px 0' }}>Range: {group.min} - {group.max} anni</p>
+                    <p style={{ margin: '5px 0' }}>Ampiezza: <strong>{range}</strong> anni</p>
+                    {hasOutliers ? (
+                      <div style={{ marginTop: '10px', padding: '8px', backgroundColor: '#fee2e2', borderRadius: '4px', fontSize: '0.8em' }}>
+                        <Icons.AlertCircle className="w-4 h-4" style={{ display: 'inline', marginRight: '4px', color: '#dc2626' }} />
+                        <strong>Outliers rilevati:</strong>
+                        {hasLowerOutliers && <p style={{ margin: '4px 0 0 20px' }}>Valori molto bassi (min: {group.min})</p>}
+                        {hasUpperOutliers && <p style={{ margin: '4px 0 0 20px' }}>Valori molto alti (max: {group.max})</p>}
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '10px', padding: '8px', backgroundColor: '#dcfce7', borderRadius: '4px', fontSize: '0.8em', color: '#166534' }}>
+                        <Icons.Check className="w-4 h-4" style={{ display: 'inline', marginRight: '4px' }} />
+                        Nessun outlier significativo
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ marginTop: '15px', padding: '12px', backgroundColor: '#fffbeb', borderRadius: '6px', fontSize: '0.85em', color: '#78350f' }}>
+            <Icons.Info className="w-4 h-4" style={{ display: 'inline', marginRight: '6px' }} />
+            <strong>Nota metodologica:</strong> Gli outliers sono identificati usando il metodo IQR (Interquartile Range). 
+            Valori che si discostano significativamente dalla media possono indicare rispondenti con età inusuali per la categoria.
+          </div>
+        </div>
       </section>
 
       {/* Confronto Genere */}
@@ -695,6 +781,97 @@ function RespondentProfiles() {
                     />
                   </BarChart>
                 </ResponsiveContainer>
+              )
+            })()}
+          </div>
+        )}
+
+        {/* Tipo di Materia: STEM vs Umanistica (solo per insegnanti) */}
+        {(category === 'teachers_active' || category === 'teachers_training') && profileData.subject_type && (
+          <div style={{ marginBottom: '30px' }}>
+            <h4 style={{ color: '#475569', marginBottom: '15px' }}>Tipo di Materia: STEM vs Umanistica</h4>
+            {(() => {
+              const subjectTypeData = Object.entries(profileData.subject_type.distribution || {})
+                .map(([name, value]) => ({
+                  name: name.includes('STEM') ? 'STEM' : 'Umanistica',
+                  fullName: name,
+                  value,
+                  percentage: ((value / profileData.subject_type.total) * 100).toFixed(1)
+                }))
+              
+              const SUBJECT_COLORS = {
+                'STEM': '#3b82f6',
+                'Umanistica': '#f59e0b'
+              }
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  {/* Grafico a torta */}
+                  <div>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={subjectTypeData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={true}
+                          label={({ name, percentage }) => `${name}: ${percentage}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {subjectTypeData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={SUBJECT_COLORS[entry.name]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload
+                            return (
+                              <div style={{ backgroundColor: 'white', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }}>
+                                <p style={{ margin: 0, fontWeight: 'bold' }}>{data.fullName}</p>
+                                <p style={{ margin: '5px 0 0 0' }}>Insegnanti: {data.value} ({data.percentage}%)</p>
+                              </div>
+                            )
+                          }
+                          return null
+                        }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Statistiche dettagliate */}
+                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '15px' }}>
+                    {subjectTypeData.map((item, index) => (
+                      <div 
+                        key={index}
+                        style={{
+                          padding: '20px',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '8px',
+                          borderLeft: `4px solid ${SUBJECT_COLORS[item.name]}`
+                        }}
+                      >
+                        <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: SUBJECT_COLORS[item.name], marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {item.name === 'STEM' ? (
+                            <><Icons.Science className="w-5 h-5" /> STEM</>
+                          ) : (
+                            <><Icons.Book className="w-5 h-5" /> Umanistica</>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b' }}>
+                          {item.value}
+                        </div>
+                        <div style={{ fontSize: '0.9rem', color: '#64748b', marginTop: '5px' }}>
+                          {item.percentage}% del totale
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '8px', fontStyle: 'italic' }}>
+                          {item.fullName}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )
             })()}
           </div>

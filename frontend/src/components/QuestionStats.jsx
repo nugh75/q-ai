@@ -77,18 +77,19 @@ function QuestionStats({ question, teacherFilter }) {
     const isScaleQuestion = stats.question_info.response_format === 'scale_1_7'
     const isYesNoQuestion = stats.question_info.response_format === 'yes_no'
     const isMultipleChoiceQuestion = stats.question_info.response_format === 'multiple_choice'
+    const isSingleChoiceQuestion = stats.question_info.response_format === 'single_choice'
 
     switch (selectedChart) {
       case 'bar': {
         // Calcola altezza dinamica in base al tipo di domanda
-        const hasLongLabels = isMultipleChoiceQuestion || (isYesNoQuestion && chartData.some(d => d.answer?.length > 20))
+        const hasLongLabels = isMultipleChoiceQuestion || isSingleChoiceQuestion || (isYesNoQuestion && chartData.some(d => d.answer?.length > 20))
         const hasManyCols = chartData.length > 6
         const useVerticalLayout = hasManyCols
         
         // Altezza dinamica: per layout verticale dipende dal numero di elementi
-        const barHeight = useVerticalLayout ? Math.max(400, chartData.length * 50) : (isMultipleChoiceQuestion ? 400 : 300)
+        const barHeight = useVerticalLayout ? Math.max(400, chartData.length * 50) : ((isMultipleChoiceQuestion || isSingleChoiceQuestion) ? 400 : 300)
         
-        const dataKey = isScaleQuestion ? "value" : (isYesNoQuestion ? "answer" : (isMultipleChoiceQuestion ? "option" : "range"))
+        const dataKey = isScaleQuestion ? "value" : (isYesNoQuestion ? "answer" : ((isMultipleChoiceQuestion || isSingleChoiceQuestion) ? "option" : "range"))
         
         return (
           <ResponsiveContainer width="100%" height={barHeight}>
@@ -148,9 +149,9 @@ function QuestionStats({ question, teacherFilter }) {
       }
 
       case 'pie': {
-        if (isYesNoQuestion) {
+        if (isYesNoQuestion || isSingleChoiceQuestion) {
           const pieData = chartData.map(item => ({
-            name: item.answer,
+            name: isYesNoQuestion ? item.answer : item.option,
             value: item.count
           }))
           return (
@@ -575,6 +576,105 @@ function QuestionStats({ question, teacherFilter }) {
     )
   }
 
+  const renderDistributionTable = () => {
+    const isMultipleChoice = stats.question_info.response_format === 'multiple_choice'
+    const isSingleChoice = stats.question_info.response_format === 'single_choice'
+
+    // Mostra tabella solo per domande con molte opzioni
+    if (!isMultipleChoice && !isSingleChoice) return null
+
+    const data = stats.distribution || []
+    if (data.length === 0) return null
+
+    return (
+      <div style={{ marginTop: '2rem' }}>
+        <h4 style={{
+          fontSize: '0.9rem',
+          fontWeight: '600',
+          marginBottom: '1rem',
+          color: '#1e293b'
+        }}>
+          Distribuzione completa ({data.length} opzioni)
+        </h4>
+        <div style={{
+          maxHeight: '400px',
+          overflowY: 'auto',
+          border: '1px solid #e2e8f0',
+          borderRadius: '0.5rem'
+        }}>
+          <table style={{
+            width: '100%',
+            fontSize: '0.85rem',
+            borderCollapse: 'collapse'
+          }}>
+            <thead style={{
+              position: 'sticky',
+              top: 0,
+              backgroundColor: '#f8fafc',
+              borderBottom: '2px solid #e2e8f0'
+            }}>
+              <tr>
+                <th style={{
+                  padding: '0.75rem',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  color: '#475569'
+                }}>#</th>
+                <th style={{
+                  padding: '0.75rem',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  color: '#475569'
+                }}>Opzione</th>
+                <th style={{
+                  padding: '0.75rem',
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  color: '#475569'
+                }}>Conteggio</th>
+                <th style={{
+                  padding: '0.75rem',
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  color: '#475569'
+                }}>%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item, index) => (
+                <tr key={index} style={{
+                  borderBottom: '1px solid #f1f5f9',
+                  backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc'
+                }}>
+                  <td style={{
+                    padding: '0.5rem 0.75rem',
+                    color: '#94a3b8',
+                    fontWeight: '500'
+                  }}>{index + 1}</td>
+                  <td style={{
+                    padding: '0.5rem 0.75rem',
+                    color: '#334155'
+                  }}>{item.option}</td>
+                  <td style={{
+                    padding: '0.5rem 0.75rem',
+                    textAlign: 'center',
+                    fontWeight: '600',
+                    color: '#3b82f6'
+                  }}>{item.count}</td>
+                  <td style={{
+                    padding: '0.5rem 0.75rem',
+                    textAlign: 'center',
+                    color: '#64748b'
+                  }}>{item.percentage}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="question-stats-container">
       <div className="stats-header">
@@ -611,6 +711,8 @@ function QuestionStats({ question, teacherFilter }) {
         <div className="chart-container">
           {renderChart()}
         </div>
+
+        {renderDistributionTable()}
       </div>
     </div>
   )

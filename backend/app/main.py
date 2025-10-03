@@ -14,6 +14,7 @@ import logging
 import os
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 # Funzioni di codifica per variabili categoriche
 def encode_gender(gender: str) -> int:
@@ -54,6 +55,10 @@ def encode_school_level(school_level: str) -> int:
 def encode_currently_teaching(value: str) -> int:
     """Codifica se insegna attualmente: Attualmente insegno=1, In formazione=0"""
     return 1 if value == 'Attualmente insegno.' else 0
+
+def encode_subject_type(subject_type: str) -> int:
+    """Codifica tipo di materia: STEM=1, Umanistica=0"""
+    return 1 if subject_type and 'STEM' in subject_type else 0
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -107,6 +112,74 @@ def health_check(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/homepage")
+def get_homepage_content():
+    """
+    Legge e restituisce il contenuto del file HOMEPAGE.md
+    """
+    try:
+        # Il file è nella directory backend
+        homepage_path = Path(__file__).parent.parent / "HOMEPAGE.md"
+        
+        if not homepage_path.exists():
+            raise HTTPException(status_code=404, detail="File HOMEPAGE.md non trovato")
+        
+        with open(homepage_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        return {
+            "content": content,
+            "last_modified": homepage_path.stat().st_mtime
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore lettura HOMEPAGE.md: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore lettura file: {str(e)}")
+
+@app.post("/api/homepage")
+def update_homepage_content(content: dict):
+    """
+    Aggiorna il contenuto del file HOMEPAGE.md
+    Richiede password di autenticazione nel body
+    """
+    try:
+        # Verifica password
+        password = content.get('password', '')
+        if password != 'Lagom129.':
+            raise HTTPException(status_code=403, detail="Password non valida")
+        
+        new_content = content.get('content', '')
+        if not new_content:
+            raise HTTPException(status_code=400, detail="Contenuto mancante")
+        
+        # Il file è nella directory backend
+        homepage_path = Path(__file__).parent.parent / "HOMEPAGE.md"
+        
+        # Backup del file corrente
+        if homepage_path.exists():
+            backup_path = Path(__file__).parent.parent / f"HOMEPAGE_backup_{int(homepage_path.stat().st_mtime)}.md"
+            import shutil
+            shutil.copy2(homepage_path, backup_path)
+            logger.info(f"Backup creato: {backup_path}")
+        
+        # Salva il nuovo contenuto
+        with open(homepage_path, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+        
+        logger.info("File HOMEPAGE.md aggiornato con successo")
+        
+        return {
+            "success": True,
+            "message": "Contenuto aggiornato con successo",
+            "last_modified": homepage_path.stat().st_mtime
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore aggiornamento HOMEPAGE.md: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore aggiornamento file: {str(e)}")
 
 @app.post("/api/import")
 def import_data(db: Session = Depends(get_db)):
@@ -716,6 +789,7 @@ def correlation_matrix(
     method: str = "pearson",
     include_non_teaching: bool = False,
     only_non_teaching: bool = False,
+    subject_type: str = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -724,6 +798,7 @@ def correlation_matrix(
     Parametri:
     - respondent_type: 'student' o 'teacher'
     - method: 'pearson' (default) o 'spearman'
+    - subject_type: (solo per teacher) 'Umanistica' o 'STEM (Science, Technology, Engineering, Mathematics)' per filtrare
 
     Variabili incluse nell'analisi:
     - practical_competence: Competenza pratica (1-7)
@@ -798,6 +873,10 @@ def correlation_matrix(
                 teacher_query = teacher_query.filter(TeacherResponse.currently_teaching != 'Attualmente insegno.')
             elif not include_non_teaching:
                 teacher_query = teacher_query.filter(TeacherResponse.currently_teaching == 'Attualmente insegno.')
+            
+            # Filtra per tipo di materia se specificato
+            if subject_type:
+                teacher_query = teacher_query.filter(TeacherResponse.subject_type == subject_type)
 
             responses = teacher_query.all()
             data_dict = {
@@ -814,11 +893,12 @@ def correlation_matrix(
                 'hours_daily': [],
                 'hours_training': [],
                 'hours_lesson_planning': [],
-                # Variabili categoriche codificate
+                # Variabili categoriche codificate (binarie 0/1)
                 'gender_code': [],
                 'uses_ai_daily_code': [],
                 'school_level_code': [],
-                'currently_teaching_code': []
+                'currently_teaching_binary': [],  # 1=Insegna, 0=Non insegna
+                'subject_type_stem': []  # 1=STEM, 0=Umanistica
             }
 
             for r in responses:
@@ -839,7 +919,9 @@ def correlation_matrix(
                 data_dict['gender_code'].append(encode_gender(r.gender) if r.gender else None)
                 data_dict['uses_ai_daily_code'].append(encode_yes_no(r.uses_ai_daily) if r.uses_ai_daily else None)
                 data_dict['school_level_code'].append(encode_school_level(r.school_level) if r.school_level else None)
-                data_dict['currently_teaching_code'].append(encode_currently_teaching(r.currently_teaching) if r.currently_teaching else None)
+                # Variabili binarie per correlazioni (0/1)
+                data_dict['currently_teaching_binary'].append(encode_currently_teaching(r.currently_teaching) if r.currently_teaching else None)
+                data_dict['subject_type_stem'].append(encode_subject_type(r.subject_type) if r.subject_type else None)
 
         # Crea DataFrame e rimuovi colonne completamente vuote
         df = pd.DataFrame(data_dict)
@@ -852,6 +934,8 @@ def correlation_matrix(
         # Aggiungi metadati
         result['respondent_type'] = respondent_type
         result['n_total'] = len(responses)
+        if subject_type:
+            result['subject_type'] = subject_type
 
         # Identifica variabili dicotomiche per punto-biserial
         dichotomous_vars = [col for col in df.columns if col.endswith('_code') and df[col].nunique() <= 2]

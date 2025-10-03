@@ -250,9 +250,16 @@ const AdvancedStats = () => {
               <h3 style={{ color: '#713f12', marginBottom: '15px' }}>
                 📈 Insights Chiave - Insegnanti
               </h3>
+              <p style={{ color: '#475569', marginBottom: '15px' }}>
+                <strong>Variabili binarie incluse:</strong>
+              </p>
+              <ul style={{ color: '#475569', lineHeight: '1.6', paddingLeft: '20px', marginBottom: '15px' }}>
+                <li><strong>currently_teaching_binary</strong>: 1 = Insegna attualmente, 0 = Non insegna</li>
+                <li><strong>subject_type_stem</strong>: 1 = STEM, 0 = Umanistica</li>
+              </ul>
               {correlationDataTeacher.significant_correlations.length > 0 && (
                 <ul style={{ color: '#475569', lineHeight: '1.8', paddingLeft: '20px' }}>
-                  {correlationDataTeacher.significant_correlations.slice(0, 3).map((corr, idx) => (
+                  {correlationDataTeacher.significant_correlations.slice(0, 5).map((corr, idx) => (
                     <li key={idx} style={{ marginBottom: '8px' }}>
                       <strong style={{ color: corr.direction === 'positive' ? '#0ea5e9' : '#ef4444' }}>
                         {corr.var1} ↔ {corr.var2}

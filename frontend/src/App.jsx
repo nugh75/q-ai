@@ -5,7 +5,7 @@ import './App.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
 
-function App() {
+function AppContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [data, setData] = useState(null)
@@ -98,6 +98,10 @@ function App() {
       <Dashboard data={data} onRefresh={loadData} />
     </div>
   )
+}
+
+function App() {
+  return <AppContent />
 }
 
 export default App

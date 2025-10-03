@@ -10,6 +10,207 @@ from .models import StudentResponse, TeacherResponse
 from .question_classifier import QuestionClassifier
 
 
+def split_subject_areas(full_text: str) -> List[str]:
+    """
+    Divide intelligentemente le classi di concorso multiple rispettando le virgole
+    nelle descrizioni.
+
+    Esempi:
+    - "A-22 Italiano, storia, geografia, A-54 Storia dell'arte" ->
+      ["A-22 Italiano, storia, geografia", "A-54 Storia dell'arte"]
+    - "Scuola Primaria, Sostegno" -> ["Scuola Primaria", "Sostegno"]
+    - "A-18 Filosofia e scienze umane" -> ["A-18 Filosofia e scienze umane"]
+
+    Args:
+        full_text: Testo completo con una o più classi di concorso
+
+    Returns:
+        Lista di classi di concorso separate
+    """
+    import re
+
+    if not full_text or full_text.strip() == '':
+        return []
+
+    text = full_text.strip()
+
+    # Trova tutte le posizioni di inizio di una nuova classe di concorso
+    # Pattern: codice classe (A-XX, B-XX, MAT/01, AAAA, etc) o keyword speciale all'inizio o dopo ", "
+    code_patterns = [
+        r'[A-Z]{1,4}[-\s]\d{2,3}',  # A-22, B-012, A 22
+        r'[A-Z]{2,4}/[A-Z0-9]{2,3}',  # MAT/01, L-LIN/02
+        r'AAA[A-Z]',  # AAAA, ADAA, ADSS
+    ]
+
+    keyword_patterns = [
+        r'Scuola\s+(?:Primaria|dell\'Infanzia|infanzia|primaria)',
+        r'Sostegno',
+        r'i\s+5\s+campi',
+    ]
+
+    # Trova tutte le posizioni di split
+    split_positions = [0]  # Inizia sempre da posizione 0
+
+    # Cerca codici di classe (possono apparire ovunque tranne all'interno di parole)
+    for pattern in code_patterns:
+        for match in re.finditer(r'(?:^|,\s*|;\s*)(' + pattern + r')', text, re.IGNORECASE):
+            pos = match.start(1)  # Posizione del codice, non del separatore
+            if pos not in split_positions:
+                split_positions.append(pos)
+
+    # Cerca keywords speciali SOLO all'inizio o dopo ", " o "; "
+    for pattern in keyword_patterns:
+        for match in re.finditer(r'(?:^|,\s*|;\s*)(' + pattern + r')', text, re.IGNORECASE):
+            pos = match.start(1)
+            if pos not in split_positions:
+                split_positions.append(pos)
+
+    split_positions.sort()
+
+    if len(split_positions) == 1:
+        # Nessuna divisione trovata
+        return [text]
+
+    # Estrai i segmenti tra le posizioni di split
+    result = []
+    for i in range(len(split_positions)):
+        start = split_positions[i]
+        end = split_positions[i+1] if i+1 < len(split_positions) else len(text)
+
+        segment = text[start:end].strip()
+        # Rimuovi virgole/punto e virgola finali
+        segment = segment.rstrip(',;').strip()
+
+        if segment:
+            result.append(segment)
+
+    return result if result else [text]
+
+
+def normalize_subject_area(raw_value: str) -> str:
+    """
+    Normalizza un singolo valore di settore disciplinare per consolidare varianti.
+
+    Questa funzione viene chiamata per ogni singola classe di concorso/area dopo
+    aver diviso per virgola le risposte multiple.
+
+    Args:
+        raw_value: Un singolo settore/classe di concorso (es. "A-18 Filosofia e scienze umane")
+
+    Returns:
+        Il valore normalizzato
+    """
+    if not raw_value:
+        return raw_value
+
+    import re
+
+    # Normalizza per confronto
+    value = raw_value.strip()
+    normalized = value.lower()
+
+    # STEP 1: Normalizza codici classe di concorso (A-XX, B-XX, AAAA, etc)
+    # Unificia varianti: A18 -> A-018, B12 -> B-012, B012 -> B-012, A 18 -> A-018
+    cdc_match = re.match(r'^([A-Z]{1,4})[-\s]?(\d{1,3})', value, re.IGNORECASE)
+    if cdc_match:
+        letter = cdc_match.group(1).upper()
+        number = cdc_match.group(2).zfill(3)  # Pad con zero: 12 -> 012, 1 -> 001
+        cdc_code = f"{letter}-{number}"
+
+        # Estrai descrizione se presente
+        rest = value[len(cdc_match.group(0)):].strip()
+        if rest:
+            # Pulisci la descrizione
+            desc = re.sub(r'^\s*[-–—,]\s*', '', rest)  # Rimuovi trattini/virgole iniziali
+            desc = re.sub(r'^\s*\(\s*', '', desc)  # Rimuovi parentesi iniziali
+            desc = re.sub(r'\s+', ' ', desc)  # Normalizza spazi multipli
+            desc = desc.strip()
+
+            # Normalizza maiuscole/minuscole: prima lettera maiuscola per ogni parola principale
+            # Mantieni acronimi (parole tutte maiuscole di 2+ lettere)
+            words = desc.split()
+            normalized_words = []
+            for word in words:
+                # Se è tutto maiuscolo e > 1 lettera, mantieni (es. "II", "I")
+                if len(word) > 1 and word.isupper():
+                    normalized_words.append(word)
+                # Se è tutto minuscolo o mixed, capitalizza prima lettera
+                else:
+                    normalized_words.append(word.capitalize() if word else word)
+            desc = ' '.join(normalized_words)
+
+            # Tronca se troppo lungo
+            if len(desc) > 50:
+                desc = desc[:47] + '...'
+
+            if desc:
+                return f"{cdc_code} - {desc}"
+
+        return cdc_code
+
+    # STEP 2: Gestisci casi speciali comuni
+
+    # Scuola dell'Infanzia
+    if re.search(r'\binfanzia\b', normalized):
+        if re.search(r'\baaaa\b|aa\s*aa', normalized):
+            return "AAAA - Scuola dell'Infanzia"
+        if re.search(r'\badaa\b|ad\s*aa', normalized):
+            return "ADAA - Sostegno Infanzia"
+        if 'sostegno' in normalized:
+            return "Sostegno - Scuola dell'Infanzia"
+        return "Scuola dell'Infanzia"
+
+    # Scuola Primaria
+    if re.search(r'\bprimaria\b', normalized):
+        if 'sostegno' in normalized:
+            return "Sostegno - Scuola Primaria"
+        if any(x in normalized for x in ['matematica', 'scienze']) and 'tutte' not in normalized:
+            return "Scuola Primaria - Matematica/Scienze"
+        if any(x in normalized for x in ['italiano', 'linguistico']):
+            return "Scuola Primaria - Italiano/Linguistico"
+        if 'i 5 campi' in normalized or 'cinque campi' in normalized or '5 campi' in normalized:
+            return "Scuola Primaria - 5 Campi di Esperienza"
+        if 'tutte le materie' in normalized:
+            return "Scuola Primaria - Tutte le materie"
+        return "Scuola Primaria"
+
+    # Sostegno generico
+    if normalized in ['sostegno', 'sostegno didattico', 'docente di sostegno', 'insegnante di sostegno']:
+        return 'Sostegno Didattico'
+    if normalized.startswith('sostegno') and 'adss' not in normalized and 'primaria' not in normalized and 'infanzia' not in normalized:
+        return 'Sostegno Didattico'
+    if re.search(r'\badss\b|ad\s*ss', normalized):
+        return 'ADSS - Sostegno Secondaria'
+    if 'admm' in normalized and 'sostegno' in normalized:
+        return 'ADMM - Sostegno Secondaria I grado'
+
+    # EEEE (Scuola Primaria)
+    if re.search(r'\bee+\b', normalized):
+        return "EEEE - Scuola Primaria"
+
+    # SSD universitari (Settore Scientifico Disciplinare)
+    # Es: "MAT/01 LOGICA MATEMATICA" -> "MAT/01"
+    ssd_match = re.match(r'^([A-Z]+[-/][A-Z0-9]+)', value, re.IGNORECASE)
+    if ssd_match:
+        ssd_code = ssd_match.group(1).upper()
+        # Normalizza separatore: sempre /
+        ssd_code = ssd_code.replace('-', '/')
+        return ssd_code
+
+    # Casi specifici testuali
+    if 'i 5 campi' in normalized or '5 campi di esperienza' in normalized:
+        return "Scuola Primaria - 5 Campi di Esperienza"
+
+    if normalized in ['pedagogia', 'scienze educazione']:
+        return normalized.title()
+
+    # Se è molto lungo (più di 80 caratteri), tronca
+    if len(value) > 80:
+        return value[:77] + '...'
+
+    return value
+
+
 class QuestionStatsService:
     """Servizio per calcolare statistiche per ogni domanda"""
     
@@ -41,30 +242,35 @@ class QuestionStatsService:
     }
     
     TEACHER_FIELD_MAPPING = {
-        2: 'currently_teaching',  # Attualmente insegni? (Sì/No)
-        3: 'age',
-        4: 'gender',  # Il tuo genere è
-        5: 'education_level',  # Titolo di studio
-        6: 'school_level',  # Ordine di scuola
-        7: 'subject_type',  # Insegna (o insegnerà) una materia
-        8: 'subject_area',  # Settore scientifico-disciplinare
-        9: 'practical_competence',
-        10: 'theoretical_competence',
-        11: 'ai_change_teaching',
-        12: 'ai_change_my_teaching',
-        13: 'training_adequacy',
-        14: 'trust_integration',
-        15: 'trust_students_responsible',
-        16: 'concern_ai_education',
-        17: 'concern_ai_students',
-        18: 'not_use_for',  # Attività per cui NON usare AI
-        19: 'uses_ai_daily',
-        20: 'hours_daily',
-        22: 'uses_ai_teaching',
-        23: 'hours_training',
-        24: 'hours_lesson_planning',
-        25: 'ai_tools',  # Strumenti AI utilizzati
-        26: 'ai_purposes',  # Scopi utilizzo AI
+        1: 'consent',
+        2: 'age',
+        3: 'gender',
+        4: 'currently_teaching',
+        5: 'qualification',
+        6: 'school_level',
+        7: 'school_location',
+        8: 'subject_area',
+        9: 'subject_type',
+        10: 'classes_taught',
+        11: 'taught_school_levels',
+        12: 'hours_ai_training',
+        13: 'practical_competence',
+        14: 'theoretical_competence',
+        15: 'ai_change_teaching',
+        16: 'training_adequacy',
+        17: 'trust_integration',
+        18: 'institution_preparation',
+        19: 'concern_ai_class',
+        20: 'concern_ai_colleagues',
+        21: 'uses_ai_daily',
+        22: 'hours_daily',
+        23: 'uses_ai_teaching',
+        24: 'hours_teaching',
+        25: 'hours_lesson_plan',
+        26: 'hours_saved',
+        27: 'ai_tools',
+        28: 'ai_purposes',
+        29: 'not_use_for',
     }
     
     def __init__(self, db: Session):
@@ -108,6 +314,8 @@ class QuestionStatsService:
             return self._get_numeric_stats(field_name, respondent_type, question_info, teacher_type)
         elif question_info['response_format'] == 'yes_no':
             return self._get_yes_no_stats(field_name, respondent_type, question_info, teacher_type)
+        elif question_info['response_format'] == 'single_choice':
+            return self._get_single_choice_stats(field_name, respondent_type, question_info, teacher_type)
         elif question_info['response_format'] == 'multiple_choice':
             return self._get_multiple_choice_stats(field_name, respondent_type, question_info, teacher_type)
         else:
@@ -349,6 +557,63 @@ class QuestionStatsService:
             "recommended_chart": "pie"
         }
     
+    def _get_single_choice_stats(self, field_name: str, respondent_type: str, question_info: Dict, teacher_type: Optional[str] = None) -> Dict[str, Any]:
+        """Statistiche per domande a scelta singola (NON dividere per virgole)"""
+        Model = StudentResponse if respondent_type == 'student' else TeacherResponse
+        field = getattr(Model, field_name)
+        
+        query = self.db.query(field).filter(field.isnot(None))
+        
+        # Applica filtro per tipo insegnante se specificato
+        if respondent_type == 'teacher' and teacher_type:
+            if teacher_type == 'active':
+                query = query.filter(TeacherResponse.currently_teaching == 'Attualmente insegno.')
+            elif teacher_type == 'training':
+                query = query.filter(TeacherResponse.currently_teaching == 'Ancora non insegno, ma sto seguendo o ho concluso un percorso PEF (Percorso di formazione iniziale degli insegnanti).')
+        
+        values = query.all()
+        values = [v[0].strip() for v in values if v[0] is not None and v[0].strip() != '']
+        
+        if not values:
+            return {
+                "question_info": question_info,
+                "has_data": False,
+                "message": "No responses for this question"
+            }
+        
+        # Applica normalizzazione per subject_area (domanda 8) per consolidare duplicati
+        if field_name == 'subject_area':
+            values = [normalize_subject_area(v) for v in values]
+        
+        # Conta occorrenze di ogni opzione (NON dividere per virgole)
+        distribution = Counter(values)
+        total_responses = len(values)
+        
+        # Crea dati per grafici
+        distribution_data = [
+            {
+                "option": option,
+                "count": count,
+                "percentage": round((count / total_responses) * 100, 2)
+            }
+            for option, count in distribution.most_common()
+        ]
+        
+        return {
+            "question_info": question_info,
+            "has_data": True,
+            "response_count": total_responses,
+            "statistics": {
+                "total_responses": total_responses,
+                "unique_options": len(distribution),
+                "most_selected": distribution.most_common(1)[0][0] if distribution else None,
+                "most_selected_count": distribution.most_common(1)[0][1] if distribution else 0
+            },
+            "distribution": distribution_data,
+            "chart_types": ["bar", "pie"],
+            "recommended_chart": "pie"
+        }
+    
     def _get_multiple_choice_stats(self, field_name: str, respondent_type: str, question_info: Dict, teacher_type: Optional[str] = None) -> Dict[str, Any]:
         """Statistiche per domande a scelta multipla"""
         Model = StudentResponse if respondent_type == 'student' else TeacherResponse
@@ -380,10 +645,17 @@ class QuestionStatsService:
         
         # Le risposte multiple sono separate da virgole o punto e virgola
         # Esempio: "ChatGPT, Gemini, Claude" -> ["ChatGPT", "Gemini", "Claude"]
+        # ATTENZIONE per subject_area: le descrizioni contengono virgole!
+        # "A-22 Italiano, storia, geografia, A-54 Storia dell'arte" ha 2 classi, non 4
         all_options = []
         for value in values:
-            # Splitta per virgola o punto e virgola
-            options = [opt.strip() for opt in value.replace(';', ',').split(',')]
+            # Per subject_area usa split intelligente, altrimenti split semplice
+            if field_name == 'subject_area':
+                options = split_subject_areas(value)
+                options = [normalize_subject_area(opt) for opt in options if opt]
+            else:
+                # Splitta per virgola o punto e virgola
+                options = [opt.strip() for opt in value.replace(';', ',').split(',')]
             all_options.extend([opt for opt in options if opt])
         
         if not all_options:

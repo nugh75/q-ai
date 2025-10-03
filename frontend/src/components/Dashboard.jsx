@@ -4,8 +4,10 @@ import { Icons } from './Icons'
 import QuestionStats from './QuestionStats'
 import RespondentView from './RespondentView'
 import RespondentProfiles from './RespondentProfiles'
+import AdvancedStats from './AdvancedStats'
 import './Dashboard.css'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
 
 // Colori per categorie di rispondenti
@@ -17,7 +19,7 @@ const RESPONDENT_COLORS = {
 }
 
 function Dashboard({ data, onRefresh }) {
-  const [activeTab, setActiveTab] = useState('questions')
+  const [activeTab, setActiveTab] = useState('progetto')
   const [teacherFilter, setTeacherFilter] = useState('current')
   const [questionsData, setQuestionsData] = useState(null)
   const [questionFilter, setQuestionFilter] = useState({ type: 'all', respondent: 'all', category: 'all', format: 'all' })
@@ -32,7 +34,7 @@ function Dashboard({ data, onRefresh }) {
   useEffect(() => {
     const loadOverviewStats = async () => {
       try {
-        const response = await fetch('http://localhost:8118/api/overview')
+        const response = await fetch(`${API_URL}/api/overview`)
         const result = await response.json()
         setOverviewStats(result)
         console.log('Overview stats:', result)
@@ -49,7 +51,7 @@ function Dashboard({ data, onRefresh }) {
     const loadQuestions = async () => {
       if (activeTab === 'questions' && !questionsData) {
         try {
-          const response = await fetch('http://localhost:8118/api/questions')
+          const response = await fetch(`${API_URL}/api/questions`)
           const result = await response.json()
           setQuestionsData(result)
           console.log('Domande caricate:', result)
@@ -139,6 +141,10 @@ function Dashboard({ data, onRefresh }) {
       </header>
 
       <nav className="dashboard-nav">
+        <button className={activeTab === 'progetto' ? 'active' : ''} onClick={() => setActiveTab('progetto')}>
+          <Icons.Chart className="w-5 h-5" />
+          Progetto
+        </button>
         <button className={activeTab === 'profiles' ? 'active' : ''} onClick={() => setActiveTab('profiles')}>
           <Icons.Users className="w-5 h-5" />
           Profili
@@ -171,12 +177,80 @@ function Dashboard({ data, onRefresh }) {
           <Icons.Tools className="w-5 h-5" />
           Strumenti
         </button>
+        <button className={activeTab === 'advanced' ? 'active' : ''} onClick={() => setActiveTab('advanced')}>
+          <Icons.Chart className="w-5 h-5" />
+          Analisi Avanzata
+        </button>
       </nav>
 
       <main className="dashboard-content">
+        {activeTab === 'progetto' && (
+          <div className="project-overview" style={{ padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
+            <h2 style={{ fontSize: '1.8rem', marginBottom: '1rem', color: '#1e293b' }}>
+              Progetto di Ricerca sull'Intelligenza Artificiale nell'Educazione
+            </h2>
+            <p style={{ fontSize: '1rem', lineHeight: '1.6', color: '#475569', marginBottom: '1.5rem' }}>
+              Questa piattaforma presenta i risultati di un'indagine approfondita sull'utilizzo e la percezione
+              dell'intelligenza artificiale nel contesto educativo italiano.
+            </p>
+
+            <h3 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '0.8rem', color: '#334155' }}>
+              Obiettivi della Ricerca
+            </h3>
+            <ul style={{ fontSize: '0.95rem', lineHeight: '1.8', color: '#475569', paddingLeft: '1.5rem' }}>
+              <li><strong>Competenze e conoscenze</strong>: Quanto studenti e insegnanti si sentono preparati nell'uso dell'IA</li>
+              <li><strong>Utilizzo pratico</strong>: Come e con quale frequenza vengono utilizzati gli strumenti di IA</li>
+              <li><strong>Atteggiamenti e percezioni</strong>: Fiducia, preoccupazioni e aspettative verso l'IA nell'educazione</li>
+              <li><strong>Impatto previsto</strong>: Come l'IA potrebbe cambiare i metodi di insegnamento e apprendimento</li>
+            </ul>
+
+            <h3 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '0.8rem', color: '#334155' }}>
+              Partecipanti
+            </h3>
+            <p style={{ fontSize: '0.95rem', lineHeight: '1.6', color: '#475569' }}>
+              Il questionario ha coinvolto:
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', margin: '1rem 0 2rem 0' }}>
+              <div style={{ padding: '1rem', backgroundColor: '#dbeafe', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e40af' }}>
+                  {overviewStats?.students || 272}
+                </div>
+                <div style={{ fontSize: '0.9rem', color: '#1e40af' }}>Studenti</div>
+              </div>
+              <div style={{ padding: '1rem', backgroundColor: '#d1fae5', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#065f46' }}>
+                  {overviewStats?.active_teachers || 358}
+                </div>
+                <div style={{ fontSize: '0.9rem', color: '#065f46' }}>Insegnanti attivi</div>
+              </div>
+              <div style={{ padding: '1rem', backgroundColor: '#fef3c7', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#92400e' }}>
+                  {overviewStats?.training_teachers || 99}
+                </div>
+                <div style={{ fontSize: '0.9rem', color: '#92400e' }}>In formazione</div>
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '0.8rem', color: '#334155' }}>
+              Navigazione della Piattaforma
+            </h3>
+            <p style={{ fontSize: '0.95rem', lineHeight: '1.6', color: '#475569' }}>
+              Utilizza i tab in alto per esplorare:
+            </p>
+            <ol style={{ fontSize: '0.95rem', lineHeight: '1.8', color: '#475569', paddingLeft: '1.5rem' }}>
+              <li><strong>Profili</strong> - Statistiche demografiche aggregate dei rispondenti</li>
+              <li><strong>Domande</strong> - Analisi dettagliata di ogni domanda con grafici interattivi</li>
+              <li><strong>Rispondenti</strong> - Ricerca e visualizzazione delle risposte individuali</li>
+              <li><strong>Analisi Avanzata</strong> - Analisi statistiche inferenziali, correlazioni e regressioni</li>
+            </ol>
+          </div>
+        )}
+
         {activeTab === 'profiles' && <RespondentProfiles />}
         
         {activeTab === 'respondents' && <RespondentView />}
+        
+        {activeTab === 'advanced' && <AdvancedStats />}
         
         {activeTab === 'questions' && questionsData && (
           <div className="questions-tab">

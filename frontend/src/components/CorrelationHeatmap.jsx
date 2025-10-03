@@ -18,29 +18,32 @@ const CorrelationHeatmap = ({ correlationData, title }) => {
   const variableLabels = variables.map(v => {
     const labelMap = {
       // Competenze Likert
-      'practical_competence': 'Comp. Pratica',
-      'theoretical_competence': 'Comp. Teorica',
+      'practical_competence': 'Competenza Pratica',
+      'theoretical_competence': 'Competenza Teorica',
       'ai_change_study': 'AI Cambia Studio',
-      'ai_change_teaching': 'AI Cambia Insegn.',
-      'training_adequacy': 'Formaz. Adeguata',
-      'trust_integration': 'Fiducia Integr.',
-      'concern_ai_school': 'Preoccup. Scuola',
-      'concern_ai_peers': 'Preoccup. Pari',
-      'concern_ai_education': 'Preoccup. Educaz.',
-      'concern_ai_students': 'Preoccup. Studenti',
+      'ai_change_teaching': 'AI Cambia Insegnamento',
+      'training_adequacy': 'Formazione Adeguata',
+      'trust_integration': 'Fiducia Integrazione',
+      'concern_ai_school': 'Preoccupazione Scuola',
+      'concern_ai_peers': 'Preoccupazione Pari',
+      'concern_ai_education': 'Preoccupazione Educazione',
+      'concern_ai_students': 'Preoccupazione Studenti',
       // Variabili numeriche
       'age': 'Età',
-      'hours_daily': 'Ore/Giorno',
+      'hours_daily': 'Ore Quotidiane',
       'hours_study': 'Ore Studio',
       'hours_training': 'Ore Formazione',
-      'hours_lesson_planning': 'Ore Pianif.',
+      'hours_lesson_planning': 'Ore Pianificazione',
       // Variabili categoriche
       'gender_code': 'Genere',
-      'uses_ai_daily_code': 'Uso Quotid.',
-      'uses_ai_study_code': 'Uso Studio',
+      'uses_ai_daily_code': 'Usa AI Quotidianamente',
+      'uses_ai_study_code': 'Usa AI Studio',
       'school_type_code': 'Tipo Scuola',
       'school_level_code': 'Livello Scuola',
-      'currently_teaching_code': 'Insegna Ora'
+      'currently_teaching_code': 'Insegna Ora',
+      // Variabili binarie
+      'currently_teaching_binary': 'Insegna (1) / Non Insegna (0)',
+      'subject_type_stem': 'STEM (1) / Umanistica (0)'
     };
     return labelMap[v] || v;
   });
@@ -113,7 +116,7 @@ const CorrelationHeatmap = ({ correlationData, title }) => {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: `140px repeat(${variables.length}, ${variables.length > 10 ? '70px' : '100px'})`,
+        gridTemplateColumns: `200px repeat(${variables.length}, ${variables.length > 12 ? '65px' : variables.length > 8 ? '80px' : '100px'})`,
         gap: '1px',
         backgroundColor: '#e2e8f0',
         padding: '2px',
@@ -158,11 +161,12 @@ const CorrelationHeatmap = ({ correlationData, title }) => {
             {/* Etichetta riga */}
             <div style={{
               backgroundColor: '#f1f5f9',
-              padding: '8px',
+              padding: '10px 8px',
               fontWeight: 'bold',
-              fontSize: '0.85em',
+              fontSize: '0.88em',
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              lineHeight: '1.3'
             }}>
               {variableLabels[i]}
             </div>
@@ -327,7 +331,9 @@ const CorrelationHeatmap = ({ correlationData, title }) => {
                         corr.strength === 'strong' ? '#1e40af' :
                         corr.strength === 'moderate' ? '#92400e' : '#991b1b'
                     }}>
-                      {corr.strength}
+                      {corr.strength === 'very strong' ? 'Molto Forte' :
+                       corr.strength === 'strong' ? 'Forte' :
+                       corr.strength === 'moderate' ? 'Moderata' : 'Debole'}
                     </span>
                   </td>
                   <td style={{ padding: '8px', textAlign: 'right', fontSize: '0.85em', color: '#64748b' }}>
