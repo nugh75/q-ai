@@ -5,6 +5,9 @@ import QuestionStats from './QuestionStats'
 import RespondentView from './RespondentView'
 import RespondentProfiles from './RespondentProfiles'
 import AdvancedStats from './AdvancedStats'
+import UsageAnalysis from './UsageAnalysis'
+import CorrelationAnalysis from './CorrelationAnalysis'
+import LikertAnalysis from './LikertAnalysis'
 import './Dashboard.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
@@ -157,21 +160,13 @@ function Dashboard({ data, onRefresh }) {
           <Icons.Search className="w-5 h-5" />
           Rispondenti
         </button>
-        <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>
-          <Icons.Overview className="w-5 h-5" />
-          Panoramica
+        <button className={activeTab === 'likert' ? 'active' : ''} onClick={() => setActiveTab('likert')}>
+          <Icons.Stats className="w-5 h-5" />
+          Likert
         </button>
-        <button className={activeTab === 'comparison' ? 'active' : ''} onClick={() => setActiveTab('comparison')}>
-          <Icons.Comparison className="w-5 h-5" />
-          Confronto
-        </button>
-        <button className={activeTab === 'students' ? 'active' : ''} onClick={() => setActiveTab('students')}>
-          <Icons.Student className="w-5 h-5" />
-          Studenti
-        </button>
-        <button className={activeTab === 'teachers' ? 'active' : ''} onClick={() => setActiveTab('teachers')}>
-          <Icons.Teacher className="w-5 h-5" />
-          Insegnanti Totali
+        <button className={activeTab === 'usage' ? 'active' : ''} onClick={() => setActiveTab('usage')}>
+          <Icons.Clock className="w-5 h-5" />
+          Utilizzo
         </button>
         <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')}>
           <Icons.Tools className="w-5 h-5" />
@@ -180,6 +175,10 @@ function Dashboard({ data, onRefresh }) {
         <button className={activeTab === 'advanced' ? 'active' : ''} onClick={() => setActiveTab('advanced')}>
           <Icons.Chart className="w-5 h-5" />
           Analisi Avanzata
+        </button>
+        <button className={activeTab === 'correlations' ? 'active' : ''} onClick={() => setActiveTab('correlations')}>
+          <Icons.TrendingUp className="w-5 h-5" />
+          Correlazioni
         </button>
       </nav>
 
@@ -197,12 +196,115 @@ function Dashboard({ data, onRefresh }) {
             <h3 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '0.8rem', color: '#334155' }}>
               Obiettivi della Ricerca
             </h3>
-            <ul style={{ fontSize: '0.95rem', lineHeight: '1.8', color: '#475569', paddingLeft: '1.5rem' }}>
-              <li><strong>Competenze e conoscenze</strong>: Quanto studenti e insegnanti si sentono preparati nell'uso dell'IA</li>
-              <li><strong>Utilizzo pratico</strong>: Come e con quale frequenza vengono utilizzati gli strumenti di IA</li>
-              <li><strong>Atteggiamenti e percezioni</strong>: Fiducia, preoccupazioni e aspettative verso l'IA nell'educazione</li>
-              <li><strong>Impatto previsto</strong>: Come l'IA potrebbe cambiare i metodi di insegnamento e apprendimento</li>
-            </ul>
+            <p style={{ fontSize: '0.95rem', lineHeight: '1.7', color: '#475569', marginBottom: '1rem' }}>
+              La presente ricerca esplora in modo approfondito e multidimensionale il rapporto tra intelligenza artificiale ed educazione 
+              nel contesto italiano, analizzando sia gli aspetti pratici che quelli percettivi dell'integrazione dell'IA nelle scuole 
+              e università. L'obiettivo è comprendere non solo le dinamiche attuali, ma anche le prospettive future dell'educazione digitale.
+            </p>
+            <div style={{ fontSize: '0.95rem', lineHeight: '1.8', color: '#475569' }}>
+              <div style={{ marginBottom: '1.5rem', paddingLeft: '1rem', borderLeft: '3px solid #3b82f6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
+                  <Icons.Student className="w-6 h-6" style={{ color: '#1e40af', flexShrink: 0 }} />
+                  <strong style={{ color: '#1e40af', fontSize: '1.05rem' }}>Competenze e Conoscenze</strong>
+                </div>
+                <p style={{ marginTop: '0.5rem', marginBottom: '0' }}>
+                  La ricerca valuta il livello di preparazione e familiarità di studenti e insegnanti con gli strumenti di intelligenza artificiale. 
+                  L'analisi si concentra sul grado di competenza percepito, sulle competenze specifiche possedute e sull'identificazione delle 
+                  principali lacune formative, con l'obiettivo di individuare le aree di eccellenza e quelle che necessitano di maggiore supporto 
+                  istituzionale e formativo.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem', paddingLeft: '1rem', borderLeft: '3px solid #10b981' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
+                  <Icons.TrendingUp className="w-6 h-6" style={{ color: '#065f46', flexShrink: 0 }} />
+                  <strong style={{ color: '#065f46', fontSize: '1.05rem' }}>Impatto e Cambiamento</strong>
+                </div>
+                <p style={{ marginTop: '0.5rem', marginBottom: '0' }}>
+                  Lo studio analizza le trasformazioni già in atto e quelle previste nei metodi di insegnamento e apprendimento. L'indagine 
+                  esamina come l'intelligenza artificiale stia modificando le dinamiche della classe, ridefinendo il ruolo dell'insegnante 
+                  e quello dello studente, e quali cambiamenti strutturali stia determinando nel panorama educativo italiano contemporaneo.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem', paddingLeft: '1rem', borderLeft: '3px solid #f59e0b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
+                  <Icons.Teacher className="w-6 h-6" style={{ color: '#92400e', flexShrink: 0 }} />
+                  <strong style={{ color: '#92400e', fontSize: '1.05rem' }}>Formazione e Preparazione</strong>
+                </div>
+                <p style={{ marginTop: '0.5rem', marginBottom: '0' }}>
+                  La ricerca esamina le esigenze formative specifiche e le strategie di sviluppo professionale necessarie per un'integrazione 
+                  efficace dell'IA nella didattica. Vengono indagati i percorsi formativi più efficaci, le modalità di preparazione degli 
+                  insegnanti attuali e futuri, e le competenze richieste per operare efficacemente come educatori nell'era dell'intelligenza 
+                  artificiale.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem', paddingLeft: '1rem', borderLeft: '3px solid #8b5cf6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
+                  <Icons.Users className="w-6 h-6" style={{ color: '#5b21b6', flexShrink: 0 }} />
+                  <strong style={{ color: '#5b21b6', fontSize: '1.05rem' }}>Fiducia e Atteggiamenti</strong>
+                </div>
+                <p style={{ marginTop: '0.5rem', marginBottom: '0' }}>
+                  Lo studio esplora le percezioni, le aspettative e le disposizioni emotive verso l'IA nel contesto educativo. Vengono analizzati 
+                  i livelli di fiducia verso questi strumenti, le speranze e le resistenze espresse, e l'evoluzione degli atteggiamenti in 
+                  relazione alla crescente presenza dell'IA nelle istituzioni scolastiche. La comprensione di questi aspetti risulta fondamentale 
+                  per un'adozione consapevole e sostenibile delle tecnologie.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem', paddingLeft: '1rem', borderLeft: '3px solid #ef4444' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
+                  <Icons.Warning className="w-6 h-6" style={{ color: '#991b1b', flexShrink: 0 }} />
+                  <strong style={{ color: '#991b1b', fontSize: '1.05rem' }}>Preoccupazioni e Rischi</strong>
+                </div>
+                <p style={{ marginTop: '0.5rem', marginBottom: '0' }}>
+                  La ricerca identifica le criticità percepite e i potenziali rischi legati all'uso dell'IA in ambito educativo: dalle questioni 
+                  etiche ai problemi di privacy, dall'equità nell'accesso agli strumenti all'affidabilità delle tecnologie, fino alle 
+                  preoccupazioni relative alla dipendenza tecnologica e alla possibile sostituzione del ruolo umano nei processi di insegnamento 
+                  e apprendimento.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem', paddingLeft: '1rem', borderLeft: '3px solid #06b6d4' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
+                  <Icons.Chart className="w-6 h-6" style={{ color: '#0e7490', flexShrink: 0 }} />
+                  <strong style={{ color: '#0e7490', fontSize: '1.05rem' }}>Utilizzo e Frequenza</strong>
+                </div>
+                <p style={{ marginTop: '0.5rem', marginBottom: '0' }}>
+                  Lo studio mappa i pattern d'uso concreti dell'intelligenza artificiale nelle istituzioni educative: quali strumenti vengono 
+                  effettivamente utilizzati nelle classi, con quale frequenza, in quali contesti educativi specifici e per quali finalità 
+                  didattiche. Questa dimensione analitica permette di distinguere tra le promesse teoriche e la realtà effettiva dell'adozione 
+                  dell'IA nel sistema educativo italiano.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem', paddingLeft: '1rem', borderLeft: '3px solid #ec4899' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
+                  <Icons.Tools className="w-6 h-6" style={{ color: '#9f1239', flexShrink: 0 }} />
+                  <strong style={{ color: '#9f1239', fontSize: '1.05rem' }}>Strumenti</strong>
+                </div>
+                <p style={{ marginTop: '0.5rem', marginBottom: '0' }}>
+                  La ricerca analizza gli strumenti di IA specifici utilizzati nel contesto educativo italiano: dalle piattaforme di apprendimento 
+                  adattivo agli assistenti virtuali, dai sistemi di valutazione automatizzata ai generatori di contenuti didattici. Vengono 
+                  esaminate le tecnologie più diffuse, quelle percepite come più utili e quelle che stanno realmente determinando un impatto 
+                  significativo sui processi educativi.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem', paddingLeft: '1rem', borderLeft: '3px solid #64748b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
+                  <Icons.AlertCircle className="w-6 h-6" style={{ color: '#334155', flexShrink: 0 }} />
+                  <strong style={{ color: '#334155', fontSize: '1.05rem' }}>Sfide</strong>
+                </div>
+                <p style={{ marginTop: '0.5rem', marginBottom: '0' }}>
+                  Lo studio esplora gli ostacoli pratici e strutturali che limitano l'adozione dell'IA nelle istituzioni educative: dalle barriere 
+                  tecnologiche (infrastrutture inadeguate, carenza di dispositivi) a quelle organizzative (resistenza al cambiamento, vincoli 
+                  temporali), fino alle sfide di natura culturale (scetticismo diffuso, assenza di visione strategica). L'identificazione di 
+                  queste sfide risulta essenziale per la formulazione di strategie di superamento efficaci.
+                </p>
+              </div>
+            </div>
 
             <h3 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '0.8rem', color: '#334155' }}>
               Partecipanti
@@ -247,11 +349,17 @@ function Dashboard({ data, onRefresh }) {
         )}
 
         {activeTab === 'profiles' && <RespondentProfiles />}
-        
+
         {activeTab === 'respondents' && <RespondentView />}
-        
+
+        {activeTab === 'likert' && <LikertAnalysis />}
+
+        {activeTab === 'usage' && <UsageAnalysis />}
+
         {activeTab === 'advanced' && <AdvancedStats />}
-        
+
+        {activeTab === 'correlations' && <CorrelationAnalysis />}
+
         {activeTab === 'questions' && questionsData && (
           <div className="questions-tab">
             <section className="questions-header">
@@ -500,279 +608,6 @@ function Dashboard({ data, onRefresh }) {
                     </div>
                   )
                 })}
-            </section>
-          </div>
-        )}
-
-        {activeTab === 'overview' && (
-          <div className="overview-tab">
-            <section className="chart-section">
-              <h2>Competenze AI - Confronto</h2>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart 
-                  data={competenceData}
-                  margin={{ top: 20, right: 30, bottom: 60, left: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="competenza"
-                    style={{ fontSize: '0.875rem' }}
-                    interval={0}
-                  />
-                  <YAxis 
-                    domain={[0, 7]}
-                    style={{ fontSize: '0.875rem' }}
-                    width={60}
-                  />
-                  <Tooltip />
-                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Bar dataKey="Studenti" fill="#8884d8" />
-                  <Bar dataKey="Insegnanti" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            </section>
-
-            <section className="chart-section">
-              <h2>Fiducia e Formazione</h2>
-              <ResponsiveContainer width="100%" height={340}>
-                <BarChart 
-                  data={trustData}
-                  margin={{ top: 20, right: 30, bottom: 80, left: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="aspect"
-                    style={{ fontSize: '0.75rem' }}
-                    angle={-15}
-                    textAnchor="end"
-                    height={60}
-                    interval={0}
-                  />
-                  <YAxis 
-                    domain={[0, 7]}
-                    style={{ fontSize: '0.875rem' }}
-                    width={60}
-                  />
-                  <Tooltip />
-                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Bar dataKey="Studenti" fill="#8884d8" />
-                  <Bar dataKey="Insegnanti" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            </section>
-
-            <section className="chart-section">
-              <h2>Utilizzo AI</h2>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart 
-                  data={usageData}
-                  margin={{ top: 20, right: 30, bottom: 60, left: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="categoria"
-                    style={{ fontSize: '0.875rem' }}
-                    interval={0}
-                  />
-                  <YAxis 
-                    style={{ fontSize: '0.875rem' }}
-                    width={60}
-                  />
-                  <Tooltip />
-                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Bar dataKey="Usa quotidianamente" fill="#82ca9d" />
-                  <Bar dataKey="Non usa" fill="#ff7c7c" />
-                </BarChart>
-              </ResponsiveContainer>
-            </section>
-
-            <section className="chart-section">
-              <h2>Ore settimanali di utilizzo</h2>
-              <ResponsiveContainer width="100%" height={340}>
-                <BarChart 
-                  data={hoursData}
-                  margin={{ top: 20, right: 30, bottom: 80, left: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="tipo"
-                    style={{ fontSize: '0.75rem' }}
-                    angle={-15}
-                    textAnchor="end"
-                    height={60}
-                    interval={0}
-                  />
-                  <YAxis 
-                    style={{ fontSize: '0.875rem' }}
-                    width={60}
-                  />
-                  <Tooltip />
-                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Bar dataKey="Studenti" fill="#8884d8" />
-                  <Bar dataKey="Insegnanti" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            </section>
-          </div>
-        )}
-
-        {activeTab === 'comparison' && (
-          <div className="comparison-tab">
-            <h2>Domande Speculari - Analisi Comparativa</h2>
-            {comparison.comparisons && comparison.comparisons.map((comp, idx) => (
-              <div key={idx} className="comparison-card">
-                <h3>{comp.question}</h3>
-                <div className="comparison-stats">
-                  <div className="comparison-col">
-                    <h4>Studenti</h4>
-                    <p className="big-number">{comp.students.mean}</p>
-                    <p className="small-text">Media (su scala 1-7)</p>
-                    <p>Mediana: {comp.students.median}</p>
-                  </div>
-                  <div className="comparison-col">
-                    <h4>Insegnanti</h4>
-                    <p className="big-number">{comp.teachers.mean}</p>
-                    <p className="small-text">Media (su scala 1-7)</p>
-                    <p>Mediana: {comp.teachers.median}</p>
-                  </div>
-                  <div className="comparison-col">
-                    <h4>Differenza</h4>
-                    <p className={`big-number ${comp.difference > 0 ? 'positive' : comp.difference < 0 ? 'negative' : ''}`}>
-                      {comp.difference > 0 ? '+' : ''}{comp.difference}
-                    </p>
-                    <p className="small-text">Insegnanti vs Studenti</p>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart 
-                    data={[
-                      { value: comp.students.mean, group: 'Studenti' },
-                      { value: comp.teachers.mean, group: 'Insegnanti' }
-                    ]}
-                    margin={{ top: 20, right: 30, bottom: 40, left: 20 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="group"
-                      style={{ fontSize: '0.875rem' }}
-                      interval={0}
-                    />
-                    <YAxis 
-                      domain={[0, 7]}
-                      style={{ fontSize: '0.875rem' }}
-                      width={60}
-                    />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#8884d8" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'students' && (
-          <div className="students-tab">
-            <section className="demographics">
-              <h2>Dati Demografici Studenti</h2>
-              <div className="demo-stats">
-                <div className="demo-card">
-                  <h4>Età Media</h4>
-                  <p className="big-number">{students.demographics?.age_avg || 0}</p>
-                  <p className="small-text">Range: {students.demographics?.age_min || 0} - {students.demographics?.age_max || 0} anni</p>
-                </div>
-                <div className="demo-card">
-                  <h4>Genere</h4>
-                  {students.demographics?.gender_distribution && Object.entries(students.demographics.gender_distribution).map(([gender, count]) => (
-                    <p key={gender}>{gender}: {count}</p>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="chart-section">
-              <h2>Competenze Studenti</h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={[
-                  { tipo: 'Pratica', valore: students.competenze?.practical?.mean || 0 },
-                  { tipo: 'Teorica', valore: students.competenze?.theoretical?.mean || 0 }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="tipo" />
-                  <YAxis domain={[0, 7]} />
-                  <Tooltip />
-                  <Bar dataKey="valore" fill="#8884d8" />
-                </BarChart>
-              </ResponsiveContainer>
-            </section>
-
-            <section className="chart-section">
-              <h2>Preoccupazioni Studenti</h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={[
-                  { tipo: 'AI a scuola', valore: students.preoccupazioni?.concern_ai_school?.mean || 0 },
-                  { tipo: 'AI compagni', valore: students.preoccupazioni?.concern_ai_peers?.mean || 0 }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="tipo" />
-                  <YAxis domain={[0, 7]} />
-                  <Tooltip />
-                  <Bar dataKey="valore" fill="#ff7c7c" />
-                </BarChart>
-              </ResponsiveContainer>
-            </section>
-          </div>
-        )}
-
-        {activeTab === 'teachers' && (
-          <div className="teachers-tab">
-            <section className="demographics">
-              <h2>Dati Demografici Insegnanti</h2>
-              <div className="demo-stats">
-                <div className="demo-card">
-                  <h4>Età Media</h4>
-                  <p className="big-number">{teachers.demographics?.age_avg || 0}</p>
-                  <p className="small-text">Range: {teachers.demographics?.age_min || 0} - {teachers.demographics?.age_max || 0} anni</p>
-                </div>
-                <div className="demo-card">
-                  <h4>Status Insegnamento</h4>
-                  {teachers.demographics?.teaching_status_distribution && Object.entries(teachers.demographics.teaching_status_distribution).map(([status, count]) => (
-                    <p key={status} className="small-text">{status}: {count}</p>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="chart-section">
-              <h2>Competenze Insegnanti</h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={[
-                  { tipo: 'Pratica', valore: teachers.competenze?.practical?.mean || 0 },
-                  { tipo: 'Teorica', valore: teachers.competenze?.theoretical?.mean || 0 }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="tipo" />
-                  <YAxis domain={[0, 7]} />
-                  <Tooltip />
-                  <Bar dataKey="valore" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            </section>
-
-            <section className="chart-section">
-              <h2>Preoccupazioni Insegnanti</h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={[
-                  { tipo: 'AI in educazione', valore: teachers.preoccupazioni?.concern_ai_education?.mean || 0 },
-                  { tipo: 'AI studenti', valore: teachers.preoccupazioni?.concern_ai_students?.mean || 0 }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="tipo" />
-                  <YAxis domain={[0, 7]} />
-                  <Tooltip />
-                  <Bar dataKey="valore" fill="#ff7c7c" />
-                </BarChart>
-              </ResponsiveContainer>
             </section>
           </div>
         )}

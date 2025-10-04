@@ -6,12 +6,23 @@ Questa piattaforma presenta i risultati di un'indagine approfondita sull'utilizz
 
 ### Obiettivi della Ricerca
 
-Il nostro studio mira a comprendere:
+Il nostro studio indaga in modo approfondito il rapporto tra intelligenza artificiale ed educazione attraverso diverse dimensioni chiave:
 
-- **Competenze e conoscenze**: Quanto studenti e insegnanti si sentono preparati nell'uso dell'IA
-- **Utilizzo pratico**: Come e con quale frequenza vengono utilizzati gli strumenti di IA
-- **Atteggiamenti e percezioni**: Fiducia, preoccupazioni e aspettative verso l'IA nell'educazione
-- **Impatto previsto**: Come l'IA potrebbe cambiare i metodi di insegnamento e apprendimento
+- **Competenze e Conoscenze**: Valutazione del livello di preparazione e familiarità di studenti e insegnanti con gli strumenti di IA, identificando lacune formative e aree di eccellenza
+
+- **Impatto e Cambiamento**: Analisi delle trasformazioni già in atto e previste nei metodi di insegnamento e apprendimento, esplorando come l'IA sta ridefinendo il panorama educativo
+
+- **Formazione e Preparazione**: Esame delle esigenze formative e delle strategie di sviluppo professionale necessarie per integrare efficacemente l'IA nella didattica
+
+- **Fiducia e Atteggiamenti**: Comprensione delle percezioni, aspettative e disposizioni emotive verso l'IA, dalle speranze alle resistenze
+
+- **Preoccupazioni e Rischi**: Identificazione delle criticità percepite, dalle questioni etiche alla privacy, dall'equità all'affidabilità degli strumenti
+
+- **Utilizzo e Frequenza**: Mappatura dei pattern d'uso concreti: quali strumenti vengono utilizzati, con quale frequenza e in quali contesti educativi
+
+- **Strumenti**: Analisi degli strumenti di IA specificamente utilizzati nel contesto educativo, dalle piattaforme di apprendimento adattivo agli assistenti virtuali
+
+- **Sfide**: Esplorazione degli ostacoli pratici e strutturali all'adozione dell'IA, dalle barriere tecnologiche a quelle organizzative e culturali
 
 ### Partecipanti
 

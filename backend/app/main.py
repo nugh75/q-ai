@@ -1645,6 +1645,728 @@ def format_response_value(value: Any, response_format: str) -> str:
         return str(value)
 
 
+@app.get("/api/usage-analysis")
+async def get_usage_analysis(db: Session = Depends(get_db)):
+    """
+    Endpoint per l'analisi dell'utilizzo dell'IA
+    Restituisce dati su chi usa l'IA, tempo dedicato, scopi e fattori di influenza
+    """
+    try:
+        # Conteggio utilizzo per gruppo
+        students = db.query(StudentResponse).all()
+        teachers = db.query(TeacherResponse).all()
+        
+        # Filtra insegnanti attivi e in formazione
+        teachers_active = [t for t in teachers if t.currently_teaching == 'Attualmente insegno.']
+        teachers_training = [t for t in teachers if t.currently_teaching == 'Ancora non insegno, ma sto seguendo o ho concluso un percorso PEF (Percorso di formazione iniziale degli insegnanti).']
+        
+        # Calcola chi usa l'IA
+        def uses_ai_student(s):
+            return s.uses_ai_daily == 'Sì' or s.uses_ai_study == 'Sì'
+        
+        def uses_ai_teacher(t):
+            return t.uses_ai_daily == 'Sì' or t.uses_ai_teaching == 'Sì'
+        
+        # Uso quotidiano
+        students_daily = sum(1 for s in students if s.uses_ai_daily and s.uses_ai_daily.lower() in ['sì', 'si', 'yes'])
+        teachers_active_daily = sum(1 for t in teachers_active if t.uses_ai_daily and t.uses_ai_daily.lower() in ['sì', 'si', 'yes'])
+        teachers_training_daily = sum(1 for t in teachers_training if t.uses_ai_daily and t.uses_ai_daily.lower() in ['sì', 'si', 'yes'])
+        
+        # Uso per studio/didattica
+        students_study = sum(1 for s in students if s.uses_ai_study and s.uses_ai_study.lower() in ['sì', 'si', 'yes'])
+        teachers_active_teaching = sum(1 for t in teachers_active if t.uses_ai_teaching and t.uses_ai_teaching.lower() in ['sì', 'si', 'yes'])
+        teachers_training_teaching = sum(1 for t in teachers_training if t.uses_ai_teaching and t.uses_ai_teaching.lower() in ['sì', 'si', 'yes'])
+        
+        usage_overview = {
+            'students': {
+                'total': len(students),
+                'using_ai_daily': students_daily,
+                'percentage_daily': round((students_daily / len(students) * 100), 1) if students else 0,
+                'using_ai_study': students_study,
+                'percentage_study': round((students_study / len(students) * 100), 1) if students else 0
+            },
+            'teachers_active': {
+                'total': len(teachers_active),
+                'using_ai_daily': teachers_active_daily,
+                'percentage_daily': round((teachers_active_daily / len(teachers_active) * 100), 1) if teachers_active else 0,
+                'using_ai_teaching': teachers_active_teaching,
+                'percentage_teaching': round((teachers_active_teaching / len(teachers_active) * 100), 1) if teachers_active else 0
+            },
+            'teachers_training': {
+                'total': len(teachers_training),
+                'using_ai_daily': teachers_training_daily,
+                'percentage_daily': round((teachers_training_daily / len(teachers_training) * 100), 1) if teachers_training else 0,
+                'using_ai_teaching': teachers_training_teaching,
+                'percentage_teaching': round((teachers_training_teaching / len(teachers_training) * 100), 1) if teachers_training else 0
+            }
+        }
+        
+        # ========== ANALISI ORE DI UTILIZZO ==========
+        def safe_float(value):
+            """Converte in float gestendo None e stringhe vuote"""
+            try:
+                if value is None or value == '' or value == 'Non lo so':
+                    return None
+                return float(value)
+            except (ValueError, TypeError):
+                return None
+        
+        def calculate_stats(values):
+            """Calcola statistiche da lista di valori includendo quartili per box plot"""
+            valid_values = [v for v in values if v is not None]
+            if not valid_values:
+                return {
+                    'mean': 0, 'median': 0, 'min': 0, 'max': 0, 'count': 0,
+                    'q1': 0, 'q3': 0, 'iqr': 0,
+                    'mean_no_outliers': 0, 'outliers_count': 0
+                }
+            
+            sorted_values = sorted(valid_values)
+            q1 = statistics.quantiles(sorted_values, n=4)[0] if len(sorted_values) >= 4 else sorted_values[0]
+            q3 = statistics.quantiles(sorted_values, n=4)[2] if len(sorted_values) >= 4 else sorted_values[-1]
+            iqr = q3 - q1
+            
+            # Identifica outlier (oltre 1.5 * IQR dai quartili)
+            lower_bound = q1 - 1.5 * iqr
+            upper_bound = q3 + 1.5 * iqr
+            values_no_outliers = [v for v in valid_values if lower_bound <= v <= upper_bound]
+            outliers = [v for v in valid_values if v < lower_bound or v > upper_bound]
+            
+            return {
+                'mean': round(statistics.mean(valid_values), 2),
+                'median': round(statistics.median(valid_values), 2),
+                'min': round(min(valid_values), 2),
+                'max': round(max(valid_values), 2),
+                'count': len(valid_values),
+                'q1': round(q1, 2),
+                'q3': round(q3, 2),
+                'iqr': round(iqr, 2),
+                'mean_no_outliers': round(statistics.mean(values_no_outliers), 2) if values_no_outliers else 0,
+                'outliers_count': len(outliers),
+                'outliers': sorted([round(v, 2) for v in outliers], reverse=True)
+            }
+        
+        # Ore studenti
+        students_daily_hours = [safe_float(s.hours_daily) for s in students if uses_ai_student(s)]
+        students_study_hours = [safe_float(s.hours_study) for s in students if uses_ai_student(s)]
+        students_learning_tools_hours = [safe_float(s.hours_learning_tools) for s in students if uses_ai_student(s)]
+        students_saved_hours = [safe_float(s.hours_saved) for s in students if uses_ai_student(s)]
+        
+        # Ore insegnanti attivi
+        teachers_active_daily = [safe_float(t.hours_daily) for t in teachers_active if uses_ai_teacher(t)]
+        teachers_active_planning = [safe_float(t.hours_lesson_planning) for t in teachers_active if uses_ai_teacher(t)]
+        teachers_active_training = [safe_float(t.hours_training) for t in teachers_active if uses_ai_teacher(t)]
+        
+        # Ore insegnanti in formazione
+        teachers_training_daily = [safe_float(t.hours_daily) for t in teachers_training if uses_ai_teacher(t)]
+        teachers_training_training = [safe_float(t.hours_training) for t in teachers_training if uses_ai_teacher(t)]
+        
+        hours_by_group = {
+            'students': {
+                'daily': calculate_stats(students_daily_hours),
+                'study': calculate_stats(students_study_hours),
+                'learning_tools': calculate_stats(students_learning_tools_hours),
+                'hours_saved': calculate_stats(students_saved_hours)
+            },
+            'teachers_active': {
+                'daily': calculate_stats(teachers_active_daily),
+                'lesson_planning': calculate_stats(teachers_active_planning),
+                'training': calculate_stats(teachers_active_training)
+            },
+            'teachers_training': {
+                'daily': calculate_stats(teachers_training_daily),
+                'training': calculate_stats(teachers_training_training)
+            }
+        }
+        
+        # ========== ANALISI SCOPI ==========
+        def aggregate_purposes(responses, field_name):
+            """Aggrega e conta gli scopi/attività"""
+            purposes_count = {}
+            total = 0
+            for resp in responses:
+                value = getattr(resp, field_name, None)
+                if value and value.strip():
+                    # Dividi per virgola e conta ogni scopo
+                    items = [item.strip() for item in value.split(',') if item.strip()]
+                    for item in items:
+                        purposes_count[item] = purposes_count.get(item, 0) + 1
+                        total += 1
+            
+            # Converti in lista ordinata per count
+            purposes_list = [
+                {
+                    'purpose': purpose,
+                    'count': count,
+                    'percentage': round((count / total * 100), 1) if total > 0 else 0
+                }
+                for purpose, count in purposes_count.items()
+            ]
+            purposes_list.sort(key=lambda x: x['count'], reverse=True)
+            return purposes_list[:15]  # Top 15
+        
+        purposes = {
+            'students': aggregate_purposes(
+                [s for s in students if uses_ai_student(s)],
+                'ai_purposes'
+            ),
+            'teachers_active': aggregate_purposes(
+                [t for t in teachers_active if uses_ai_teacher(t)],
+                'ai_purposes'
+            ),
+            'teachers_training': aggregate_purposes(
+                [t for t in teachers_training if uses_ai_teacher(t)],
+                'ai_purposes'
+            )
+        }
+        
+        # ========== ANALISI FATTORI DI INFLUENZA ==========
+        def analyze_by_age(responses, get_hours_func, uses_ai_func):
+            """Analizza ore per fascia d'età"""
+            if get_hours_func is None:
+                return []
+
+            age_data = []
+            for resp in responses:
+                if uses_ai_func(resp):
+                    age = safe_float(resp.age)
+                    hours = get_hours_func(resp)
+                    if age is not None and hours is not None:
+                        age_data.append({'age': age, 'hours': hours})
+            return age_data
+
+        def analyze_by_gender(responses, get_hours_func, uses_ai_func):
+            """Analizza ore per genere"""
+            if get_hours_func is None:
+                return {}
+
+            gender_stats = {}
+            for resp in responses:
+                if uses_ai_func(resp) and resp.gender:
+                    gender = resp.gender
+                    hours = get_hours_func(resp)
+                    if hours is not None:
+                        gender_stats.setdefault(gender, []).append(hours)
+
+            return {
+                gender: calculate_stats(hours_list)
+                for gender, hours_list in gender_stats.items()
+            }
+
+        def analyze_by_stem(responses, get_hours_func, uses_ai_func, subject_field):
+            """Analizza ore STEM vs Umanistico"""
+            if get_hours_func is None:
+                return {
+                    'stem': calculate_stats([]),
+                    'humanistic': calculate_stats([])
+                }
+
+            stem_hours = []
+            humanistic_hours = []
+
+            for resp in responses:
+                if uses_ai_func(resp):
+                    subject = getattr(resp, subject_field, None)
+                    hours = get_hours_func(resp)
+                    if hours is not None and subject:
+                        if 'STEM' in str(subject):
+                            stem_hours.append(hours)
+                        else:
+                            humanistic_hours.append(hours)
+
+            return {
+                'stem': calculate_stats(stem_hours),
+                'humanistic': calculate_stats(humanistic_hours)
+            }
+
+        metric_labels = {
+            'uso_quotidiano': "Uso quotidiano dell'IA",
+            'studio_didattica': "Ore per studio/didattica",
+            'ore_settimanali': "Ore settimanali di utilizzo",
+            'formazione_autoapprendimento': "Formazione e autoapprendimento",
+            'ore_risparmiate': "Ore risparmiate (studenti)",
+            'preparazione_lezione': "Preparazione lezioni (docenti)"
+        }
+
+        age_metric_config = {
+            'uso_quotidiano': {
+                'students': lambda s: safe_float(s.hours_daily),
+                'teachers_active': lambda t: safe_float(t.hours_daily),
+                'teachers_training': lambda t: safe_float(t.hours_daily)
+            },
+            'studio_didattica': {
+                'students': lambda s: safe_float(s.hours_study),
+                'teachers_active': lambda t: safe_float(t.hours_lesson_planning),
+                'teachers_training': lambda t: safe_float(t.hours_training)
+            },
+            'ore_settimanali': {
+                'students': lambda s: safe_float(s.hours_daily),
+                'teachers_active': lambda t: safe_float(t.hours_daily),
+                'teachers_training': lambda t: safe_float(t.hours_daily)
+            },
+            'formazione_autoapprendimento': {
+                'students': lambda s: safe_float(s.hours_learning_tools),
+                'teachers_active': lambda t: safe_float(t.hours_training),
+                'teachers_training': lambda t: safe_float(t.hours_training)
+            },
+            'ore_risparmiate': {
+                'students': lambda s: safe_float(s.hours_saved)
+            },
+            'preparazione_lezione': {
+                'teachers_active': lambda t: safe_float(t.hours_lesson_planning)
+            }
+        }
+
+        gender_metric_config = age_metric_config
+
+        stem_metric_config = age_metric_config
+
+        def build_age_metrics():
+            metrics = {}
+            for metric_key, funcs in age_metric_config.items():
+                metrics[metric_key] = {
+                    'students': analyze_by_age(students, funcs.get('students'), uses_ai_student),
+                    'teachers_active': analyze_by_age(teachers_active, funcs.get('teachers_active'), uses_ai_teacher),
+                    'teachers_training': analyze_by_age(teachers_training, funcs.get('teachers_training'), uses_ai_teacher)
+                }
+            return metrics
+
+        def build_gender_metrics():
+            metrics = {}
+            for metric_key, funcs in gender_metric_config.items():
+                metrics[metric_key] = {
+                    'students': analyze_by_gender(students, funcs.get('students'), uses_ai_student),
+                    'teachers_active': analyze_by_gender(teachers_active, funcs.get('teachers_active'), uses_ai_teacher),
+                    'teachers_training': analyze_by_gender(teachers_training, funcs.get('teachers_training'), uses_ai_teacher)
+                }
+            return metrics
+
+        def build_stem_metrics():
+            metrics = {}
+            for metric_key, funcs in stem_metric_config.items():
+                metrics[metric_key] = {
+                    'students': analyze_by_stem(students, funcs.get('students'), uses_ai_student, 'study_path'),
+                    'teachers_active': analyze_by_stem(teachers_active, funcs.get('teachers_active'), uses_ai_teacher, 'subject_type'),
+                    'teachers_training': analyze_by_stem(teachers_training, funcs.get('teachers_training'), uses_ai_teacher, 'subject_type')
+                }
+            return metrics
+
+        influence_metric_config = {
+            'competenza_pratica': {
+                'label': 'Competenza pratica percepita (1-7)',
+                'type': 'scale_1_7',
+                'students': lambda s: safe_float(s.practical_competence),
+                'teachers_active': lambda t: safe_float(t.practical_competence),
+                'teachers_training': lambda t: safe_float(t.practical_competence)
+            },
+            'competenza_teorica': {
+                'label': 'Competenza teorica percepita (1-7)',
+                'type': 'scale_1_7',
+                'students': lambda s: safe_float(s.theoretical_competence),
+                'teachers_active': lambda t: safe_float(t.theoretical_competence),
+                'teachers_training': lambda t: safe_float(t.theoretical_competence)
+            },
+            'fiducia_integrazione': {
+                'label': 'Fiducia nell\'integrazione dell\'IA (1-7)',
+                'type': 'scale_1_7',
+                'students': lambda s: safe_float(s.trust_integration),
+                'teachers_active': lambda t: safe_float(t.trust_integration),
+                'teachers_training': lambda t: safe_float(t.trust_integration)
+            },
+            'preoccupazioni_ia': {
+                'label': 'Preoccupazioni sull\'IA (1-7)',
+                'type': 'scale_1_7',
+                'students': lambda s: safe_float(s.concern_ai_school),
+                'teachers_active': lambda t: safe_float(t.concern_ai_education),
+                'teachers_training': lambda t: safe_float(t.concern_ai_students)
+            },
+            'formazione_adeguata': {
+                'label': 'Percezione adeguatezza formazione (1-7)',
+                'type': 'scale_1_7',
+                'students': lambda s: safe_float(s.training_adequacy),
+                'teachers_active': lambda t: safe_float(t.training_adequacy),
+                'teachers_training': lambda t: safe_float(t.training_adequacy)
+            },
+            'percezione_docenti_preparati': {
+                'label': 'Percezione docenti preparati (studenti)',
+                'type': 'scale_1_7',
+                'students': lambda s: safe_float(s.teacher_preparation)
+            },
+            'fiducia_studenti_responsabili': {
+                'label': 'Fiducia student\* responsabili (docenti)',
+                'type': 'scale_1_7',
+                'teachers_active': lambda t: safe_float(t.trust_students_responsible),
+                'teachers_training': lambda t: safe_float(t.trust_students_responsible)
+            },
+            'ore_formazione_specifica': {
+                'label': 'Ore di formazione specifica sull\'IA',
+                'type': 'hours',
+                'students': lambda s: safe_float(s.hours_learning_tools),
+                'teachers_active': lambda t: safe_float(t.hours_training),
+                'teachers_training': lambda t: safe_float(t.hours_training)
+            },
+            'impatto_percepito': {
+                'label': 'Percezione impatto dell\'IA su studio/didattica',
+                'type': 'scale_1_7',
+                'students': lambda s: safe_float(s.ai_change_study),
+                'teachers_active': lambda t: safe_float(t.ai_change_teaching),
+                'teachers_training': lambda t: safe_float(t.ai_change_teaching)
+            }
+        }
+
+        def build_influence_metrics():
+            metrics = {}
+            for metric_key, config in influence_metric_config.items():
+                groups_stats = {}
+                for group_key, dataset in (
+                    ('students', students),
+                    ('teachers_active', teachers_active),
+                    ('teachers_training', teachers_training)
+                ):
+                    extractor = config.get(group_key)
+                    if extractor is None:
+                        groups_stats[group_key] = calculate_stats([])
+                        continue
+                    values = [extractor(item) for item in dataset]
+                    cleaned = [v for v in values if v is not None]
+                    groups_stats[group_key] = calculate_stats(cleaned)
+
+                metrics[metric_key] = {
+                    'label': config['label'],
+                    'type': config.get('type', 'scale_1_7'),
+                    'groups': groups_stats
+                }
+
+            return metrics
+
+        factors = {
+            'metric_labels': metric_labels,
+            'age': build_age_metrics(),
+            'gender': build_gender_metrics(),
+            'stem_vs_humanistic': build_stem_metrics()
+        }
+
+        influence_factors = {
+            'metric_labels': { key: cfg['label'] for key, cfg in influence_metric_config.items() },
+            'metrics': build_influence_metrics()
+        }
+
+        usage_metric_config = {
+            'uso_quotidiano': {
+                'students': lambda s: safe_float(s.hours_daily),
+                'teachers_active': lambda t: safe_float(t.hours_daily),
+                'teachers_training': lambda t: safe_float(t.hours_daily)
+            },
+            'studio_didattica': {
+                'students': lambda s: safe_float(s.hours_study),
+                'teachers_active': lambda t: safe_float(t.hours_lesson_planning),
+                'teachers_training': lambda t: safe_float(t.hours_training)
+            },
+            'ore_settimanali': {
+                'students': lambda s: safe_float(s.hours_daily),
+                'teachers_active': lambda t: safe_float(t.hours_daily),
+                'teachers_training': lambda t: safe_float(t.hours_daily)
+            },
+            'formazione_autoapprendimento': {
+                'students': lambda s: safe_float(s.hours_learning_tools),
+                'teachers_active': lambda t: safe_float(t.hours_training),
+                'teachers_training': lambda t: safe_float(t.hours_training)
+            },
+            'ore_risparmiate': {
+                'students': lambda s: safe_float(s.hours_saved)
+            },
+            'preparazione_lezione': {
+                'teachers_active': lambda t: safe_float(t.hours_lesson_planning)
+            }
+        }
+
+        def pearson_correlation(pairs: list[tuple[float, float]]) -> float | None:
+            n = len(pairs)
+            if n < 2:
+                return None
+            xs, ys = zip(*pairs)
+            mean_x = statistics.mean(xs)
+            mean_y = statistics.mean(ys)
+            num = sum((x - mean_x) * (y - mean_y) for x, y in pairs)
+            den_x = sum((x - mean_x) ** 2 for x in xs)
+            den_y = sum((y - mean_y) ** 2 for y in ys)
+            denom = (den_x * den_y) ** 0.5
+            if denom == 0:
+                return None
+            return num / denom
+
+        influence_correlations: dict[str, dict[str, dict[str, dict[str, float | int | None]]]] = {}
+
+        for usage_key, usage_funcs in usage_metric_config.items():
+            influence_correlations[usage_key] = {}
+            for influence_key, influence_cfg in influence_metric_config.items():
+                group_results = {}
+                for group_key, dataset in (
+                    ('students', students),
+                    ('teachers_active', teachers_active),
+                    ('teachers_training', teachers_training)
+                ):
+                    usage_extractor = usage_funcs.get(group_key)
+                    influence_extractor = influence_cfg.get(group_key)
+
+                    if usage_extractor is None or influence_extractor is None:
+                        group_results[group_key] = {'correlation': None, 'n': 0}
+                        continue
+
+                    pairs = []
+                    for resp in dataset:
+                        usage_value = usage_extractor(resp)
+                        influence_value = influence_extractor(resp)
+                        if usage_value is not None and influence_value is not None:
+                            pairs.append((usage_value, influence_value))
+
+                    corr = pearson_correlation(pairs)
+                    group_results[group_key] = {
+                        'correlation': corr,
+                        'n': len(pairs)
+                    }
+
+                influence_correlations[usage_key][influence_key] = group_results
+
+        return {
+            'usage_overview': usage_overview,
+            'hours_by_group': hours_by_group,
+            'purposes': purposes,
+            'factors': factors,
+            'influence_factors': influence_factors,
+            'influence_correlations': influence_correlations
+        }
+        
+    except Exception as e:
+        logger.error(f"Errore nell'analisi utilizzo: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/correlations")
+async def get_correlation_analysis(db: Session = Depends(get_db)):
+    """
+    Analisi di correlazione tra fattori Likert (1-7) e variabili di utilizzo
+
+    Studenti: correlazioni tra fattori di influenzamento e:
+    - uso quotidiano AI
+    - ore settimanali utilizzo
+    - ore studio con AI
+    - ore risparmiate
+
+    Insegnanti attivi: correlazioni tra fattori e:
+    - uso quotidiano AI
+    - ore settimanali utilizzo
+    - ore formazione/autoapprendimento
+    - ore preparazione lezioni
+
+    Insegnanti in formazione: stesse correlazioni degli attivi
+    """
+    try:
+        analytics = Analytics(db)
+        data = analytics.get_correlation_analysis()
+
+        return {
+            'students': data.get('students', {}),
+            'teachers_active': data.get('teachers_active', {}),
+            'teachers_in_training': data.get('teachers_in_training', {})
+        }
+
+    except Exception as e:
+        logger.error(f"Errore nell'analisi correlazioni: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/likert-questions")
+def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Ottieni tutte le domande con scala Likert (1-7) suddivise per gruppo.
+    Include testo delle domande e statistiche complete.
+
+    Gruppi:
+    - students: Studenti
+    - teachers_active: Insegnanti che insegnano attualmente
+    - teachers_training: Insegnanti in formazione (non insegnano attualmente)
+    """
+    try:
+        # Definizione domande Likert per studenti
+        student_likert_fields = [
+            ('practical_competence', 'Quanto ti senti competente nell\'utilizzo pratico dell\'intelligenza artificiale?'),
+            ('theoretical_competence', 'Quanto ti senti competente nelle conoscenze teoriche sull\'intelligenza artificiale?'),
+            ('ai_change_study', 'Quanto credi che l\'IA cambierà il modo in cui studi?'),
+            ('training_adequacy', 'Quanto ritieni adeguata la formazione ricevuta sull\'IA?'),
+            ('trust_integration', 'Quanto hai fiducia nell\'integrazione dell\'IA nell\'istruzione?'),
+            ('teacher_preparation', 'Quanto ritieni che i tuoi insegnanti siano preparati sull\'IA?'),
+            ('concern_ai_school', 'Quanto ti preoccupa l\'uso dell\'IA nella scuola?'),
+            ('concern_ai_peers', 'Quanto ti preoccupa l\'uso dell\'IA da parte dei tuoi compagni?')
+        ]
+
+        # Definizione domande Likert per insegnanti
+        teacher_likert_fields = [
+            ('practical_competence', 'Quanto ti senti competente nell\'utilizzo pratico dell\'intelligenza artificiale?'),
+            ('theoretical_competence', 'Quanto ti senti competente nelle conoscenze teoriche sull\'intelligenza artificiale?'),
+            ('ai_change_teaching', 'Quanto credi che l\'IA cambierà l\'insegnamento in generale?'),
+            ('ai_change_my_teaching', 'Quanto credi che l\'IA cambierà il tuo modo di insegnare?'),
+            ('training_adequacy', 'Quanto ritieni adeguata la formazione ricevuta sull\'IA?'),
+            ('trust_integration', 'Quanto hai fiducia nell\'integrazione dell\'IA nell\'istruzione?'),
+            ('trust_students_responsible', 'Quanto hai fiducia che gli studenti usino l\'IA in modo responsabile?'),
+            ('concern_ai_education', 'Quanto ti preoccupa l\'uso dell\'IA nell\'istruzione?'),
+            ('concern_ai_students', 'Quanto ti preoccupa l\'uso dell\'IA da parte degli studenti?')
+        ]
+
+        # Domande condivise tra studenti e insegnanti
+        shared_questions = {
+            'practical_competence',
+            'theoretical_competence',
+            'training_adequacy',
+            'trust_integration'
+        }
+
+        questions = []
+
+        # Studenti
+        students = db.query(StudentResponse).all()
+        for field_name, question_text in student_likert_fields:
+            values = [getattr(s, field_name) for s in students if getattr(s, field_name) is not None]
+
+            if values:
+                distribution = {i: 0 for i in range(1, 8)}
+                for v in values:
+                    if 1 <= v <= 7:
+                        distribution[int(v)] += 1
+
+                # Calcola quartili per box plot
+                sorted_values = sorted(values)
+                q1 = np.percentile(sorted_values, 25)
+                q3 = np.percentile(sorted_values, 75)
+                min_val = min(sorted_values)
+                max_val = max(sorted_values)
+
+                questions.append({
+                    'respondent_type': 'students',
+                    'column_name': field_name,
+                    'question_text': question_text,
+                    'is_shared': field_name in shared_questions,
+                    'shared_key': field_name if field_name in shared_questions else None,
+                    'stats': {
+                        'total_responses': len(values),
+                        'mean': round(statistics.mean(values), 2),
+                        'median': round(statistics.median(values), 2),
+                        'std_dev': round(statistics.stdev(values), 2) if len(values) > 1 else 0,
+                        'distribution': distribution,
+                        'quartiles': {
+                            'min': round(float(min_val), 2),
+                            'q1': round(float(q1), 2),
+                            'q2': round(statistics.median(values), 2),
+                            'q3': round(float(q3), 2),
+                            'max': round(float(max_val), 2)
+                        }
+                    }
+                })
+
+        # Insegnanti attivi
+        teachers_active = db.query(TeacherResponse).filter(
+            TeacherResponse.currently_teaching == 'Attualmente insegno.'
+        ).all()
+
+        for field_name, question_text in teacher_likert_fields:
+            values = [getattr(t, field_name) for t in teachers_active if getattr(t, field_name) is not None]
+
+            if values:
+                distribution = {i: 0 for i in range(1, 8)}
+                for v in values:
+                    if 1 <= v <= 7:
+                        distribution[int(v)] += 1
+
+                # Calcola quartili per box plot
+                sorted_values = sorted(values)
+                q1 = np.percentile(sorted_values, 25)
+                q3 = np.percentile(sorted_values, 75)
+                min_val = min(sorted_values)
+                max_val = max(sorted_values)
+
+                questions.append({
+                    'respondent_type': 'teachers_active',
+                    'column_name': field_name,
+                    'question_text': question_text,
+                    'is_shared': field_name in shared_questions,
+                    'shared_key': field_name if field_name in shared_questions else None,
+                    'stats': {
+                        'total_responses': len(values),
+                        'mean': round(statistics.mean(values), 2),
+                        'median': round(statistics.median(values), 2),
+                        'std_dev': round(statistics.stdev(values), 2) if len(values) > 1 else 0,
+                        'distribution': distribution,
+                        'quartiles': {
+                            'min': round(float(min_val), 2),
+                            'q1': round(float(q1), 2),
+                            'q2': round(statistics.median(values), 2),
+                            'q3': round(float(q3), 2),
+                            'max': round(float(max_val), 2)
+                        }
+                    }
+                })
+
+        # Insegnanti in formazione
+        teachers_training = db.query(TeacherResponse).filter(
+            TeacherResponse.currently_teaching != 'Attualmente insegno.'
+        ).all()
+
+        for field_name, question_text in teacher_likert_fields:
+            values = [getattr(t, field_name) for t in teachers_training if getattr(t, field_name) is not None]
+
+            if values:
+                distribution = {i: 0 for i in range(1, 8)}
+                for v in values:
+                    if 1 <= v <= 7:
+                        distribution[int(v)] += 1
+
+                # Calcola quartili per box plot
+                sorted_values = sorted(values)
+                q1 = np.percentile(sorted_values, 25)
+                q3 = np.percentile(sorted_values, 75)
+                min_val = min(sorted_values)
+                max_val = max(sorted_values)
+
+                questions.append({
+                    'respondent_type': 'teachers_training',
+                    'column_name': field_name,
+                    'question_text': question_text,
+                    'is_shared': field_name in shared_questions,
+                    'shared_key': field_name if field_name in shared_questions else None,
+                    'stats': {
+                        'total_responses': len(values),
+                        'mean': round(statistics.mean(values), 2),
+                        'median': round(statistics.median(values), 2),
+                        'std_dev': round(statistics.stdev(values), 2) if len(values) > 1 else 0,
+                        'distribution': distribution,
+                        'quartiles': {
+                            'min': round(float(min_val), 2),
+                            'q1': round(float(q1), 2),
+                            'q2': round(statistics.median(values), 2),
+                            'q3': round(float(q3), 2),
+                            'max': round(float(max_val), 2)
+                        }
+                    }
+                })
+
+        # Statistiche generali
+        stats = {
+            'total_questions': len(questions),
+            'students_questions': len([q for q in questions if q['respondent_type'] == 'students']),
+            'teachers_active_questions': len([q for q in questions if q['respondent_type'] == 'teachers_active']),
+            'teachers_training_questions': len([q for q in questions if q['respondent_type'] == 'teachers_training']),
+            'shared_questions': len(shared_questions)
+        }
+
+        return {
+            'questions': questions,
+            'statistics': stats
+        }
+
+    except Exception as e:
+        logger.error(f"Errore nel recupero domande Likert: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
