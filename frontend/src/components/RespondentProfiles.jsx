@@ -1,5 +1,16 @@
 import { useState, useEffect } from 'react'
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Scatter, Line } from 'recharts'
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts'
 import { Icons } from './Icons'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
@@ -17,6 +28,70 @@ const GENDER_COLORS = {
   'Altro o preferisco non specificare': '#6b7280'
 }
 
+// Funzioni di utilità per il download
+const downloadSVG = (svgId, filename) => {
+  const svg = document.getElementById(svgId)
+  if (!svg) return
+  
+  const serializer = new XMLSerializer()
+  const svgString = serializer.serializeToString(svg)
+  const blob = new Blob([svgString], { type: 'image/svg+xml' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+const downloadPNG = (svgId, filename) => {
+  const svg = document.getElementById(svgId)
+  if (!svg) return
+  
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  const svgData = new XMLSerializer().serializeToString(svg)
+  const img = new Image()
+  
+  canvas.width = svg.width.baseVal.value * 2
+  canvas.height = svg.height.baseVal.value * 2
+  ctx.scale(2, 2)
+  
+  img.onload = () => {
+    ctx.fillStyle = 'white'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0)
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(url)
+    })
+  }
+  
+  img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+}
+
+const downloadCSV = (data, headers, filename) => {
+  const csv = [
+    headers.join(','),
+    ...data.map(row => headers.map(h => {
+      const value = row[h]
+      return typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+    }).join(','))
+  ].join('\n')
+  
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 /**
  * Componente per visualizzare profili demografici dei rispondenti
  * Confronta studenti, insegnanti attivi e insegnanti in formazione
@@ -30,6 +105,8 @@ function RespondentProfiles() {
     teachers_active: false,
     teachers_training: false
   })
+  const [hoveredBox, setHoveredBox] = useState(null)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
   useEffect(() => {
     loadDemographics()
@@ -94,11 +171,47 @@ function RespondentProfiles() {
     { name: 'In Formazione', value: data.totals.teachers_training, color: COLORS.teachers_training }
   ]
 
-  // Dati età comparativa
+  // Dati età comparativa con quartili e outliers
   const ageData = [
-    { category: 'Studenti', avg: data.students.age.avg, min: data.students.age.min, max: data.students.age.max },
-    { category: 'Insegnanti', avg: data.teachers_active.age.avg, min: data.teachers_active.age.min, max: data.teachers_active.age.max },
-    { category: 'In Formazione', avg: data.teachers_training.age.avg, min: data.teachers_training.age.min, max: data.teachers_training.age.max }
+    {
+      category: 'Studenti',
+      avg: data.students.age?.avg ?? 0,
+      min: data.students.age?.min ?? 0,
+      max: data.students.age?.max ?? 0,
+      q1: data.students.age?.q1 ?? data.students.age?.min ?? 0,
+      median: data.students.age?.median ?? data.students.age?.avg ?? 0,
+      q3: data.students.age?.q3 ?? data.students.age?.max ?? 0,
+      whiskerLow: data.students.age?.whisker_low ?? data.students.age?.min ?? 0,
+      whiskerHigh: data.students.age?.whisker_high ?? data.students.age?.max ?? 0,
+      outliers: data.students.age?.outliers ?? [],
+      total: data.students.age?.total ?? 0
+    },
+    {
+      category: 'Insegnanti',
+      avg: data.teachers_active.age?.avg ?? 0,
+      min: data.teachers_active.age?.min ?? 0,
+      max: data.teachers_active.age?.max ?? 0,
+      q1: data.teachers_active.age?.q1 ?? data.teachers_active.age?.min ?? 0,
+      median: data.teachers_active.age?.median ?? data.teachers_active.age?.avg ?? 0,
+      q3: data.teachers_active.age?.q3 ?? data.teachers_active.age?.max ?? 0,
+      whiskerLow: data.teachers_active.age?.whisker_low ?? data.teachers_active.age?.min ?? 0,
+      whiskerHigh: data.teachers_active.age?.whisker_high ?? data.teachers_active.age?.max ?? 0,
+      outliers: data.teachers_active.age?.outliers ?? [],
+      total: data.teachers_active.age?.total ?? 0
+    },
+    {
+      category: 'In Formazione',
+      avg: data.teachers_training.age?.avg ?? 0,
+      min: data.teachers_training.age?.min ?? 0,
+      max: data.teachers_training.age?.max ?? 0,
+      q1: data.teachers_training.age?.q1 ?? data.teachers_training.age?.min ?? 0,
+      median: data.teachers_training.age?.median ?? data.teachers_training.age?.avg ?? 0,
+      q3: data.teachers_training.age?.q3 ?? data.teachers_training.age?.max ?? 0,
+      whiskerLow: data.teachers_training.age?.whisker_low ?? data.teachers_training.age?.min ?? 0,
+      whiskerHigh: data.teachers_training.age?.whisker_high ?? data.teachers_training.age?.max ?? 0,
+      outliers: data.teachers_training.age?.outliers ?? [],
+      total: data.teachers_training.age?.total ?? 0
+    }
   ]
 
   // Dati genere per studenti
@@ -195,6 +308,64 @@ function RespondentProfiles() {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+
+        {/* Tabella Totali */}
+        <div style={{ marginTop: '25px', overflowX: 'auto' }}>
+          <h4 style={{ marginBottom: '15px', color: '#334155' }}>Tabella Dati Totali</h4>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9' }}>
+                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Categoria</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Numero</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Percentuale</th>
+              </tr>
+            </thead>
+            <tbody>
+              {totalData.map((item, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                  <td style={{ padding: '12px', fontWeight: '600', color: item.color }}>{item.name}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>{item.value}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>{((item.value / data.totals.all) * 100).toFixed(1)}%</td>
+                </tr>
+              ))}
+              <tr style={{ backgroundColor: '#f0f9ff', fontWeight: '600' }}>
+                <td style={{ padding: '12px', color: '#0ea5e9' }}>Totale</td>
+                <td style={{ padding: '12px', textAlign: 'center', color: '#0ea5e9' }}>{data.totals.all}</td>
+                <td style={{ padding: '12px', textAlign: 'center', color: '#0ea5e9' }}>100%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pulsanti Download Totali */}
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              const csvData = totalData.map(item => ({
+                Categoria: item.name,
+                Numero: item.value,
+                Percentuale: ((item.value / data.totals.all) * 100).toFixed(1) + '%'
+              }))
+              csvData.push({ Categoria: 'Totale', Numero: data.totals.all, Percentuale: '100%' })
+              downloadCSV(csvData, ['Categoria', 'Numero', 'Percentuale'], 'totali-rispondenti.csv')
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.9em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Icons.Save className="w-4 h-4" />
+            Scarica Dati CSV
+          </button>
+        </div>
       </section>
 
       {/* Confronto Età con Box Plot */}
@@ -211,38 +382,315 @@ function RespondentProfiles() {
         <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '6px', display: 'flex', gap: '10px' }}>
           <Icons.Info className="w-5 h-5" style={{ color: '#3b82f6', flexShrink: 0, marginTop: '2px' }} />
           <p style={{ fontSize: '0.9em', color: '#64748b', margin: 0 }}>
-            Il box plot mostra la distribuzione dell'età: la barra blu è la media, le linee grigie rappresentano il range min-max.
-            Viene mostrato un report dettagliato sugli outliers (valori anomali) sotto il grafico.
+            Il box plot mostra quartili (riquadro), mediana (linea rossa), media (rombo scuro), baffi (limiti calcolati con IQR) e punti per ogni outlier.
+            Sotto al grafico trovi un report dettagliato con la spiegazione degli outliers per ogni gruppo.
           </p>
         </div>
-        <ResponsiveContainer width="100%" height={350}>
-          <ComposedChart data={ageData} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="category" />
-            <YAxis domain={[0, 'auto']} label={{ value: 'Età', angle: -90, position: 'insideLeft' }} />
-            <Tooltip content={({ active, payload }) => {
-              if (active && payload && payload.length) {
-                const data = payload[0].payload
-                return (
-                  <div style={{ backgroundColor: 'white', padding: '12px', border: '1px solid #ccc', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-                    <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', color: '#1e40af' }}>{data.category}</p>
-                    <p style={{ margin: '4px 0', fontSize: '0.9em' }}>Età Media: <strong>{data.avg}</strong></p>
-                    <p style={{ margin: '4px 0', fontSize: '0.9em' }}>Età Min: <strong>{data.min}</strong></p>
-                    <p style={{ margin: '4px 0', fontSize: '0.9em' }}>Età Max: <strong>{data.max}</strong></p>
-                    <p style={{ margin: '4px 0', fontSize: '0.9em' }}>Range: <strong>{data.max - data.min}</strong> anni</p>
-                  </div>
-                )
-              }
-              return null
-            }} />
-            <Legend />
-            {/* Linee per min e max */}
-            <Line type="monotone" dataKey="min" stroke="#94a3b8" strokeWidth={2} name="Min" dot={{ r: 4 }} />
-            <Line type="monotone" dataKey="max" stroke="#94a3b8" strokeWidth={2} name="Max" dot={{ r: 4 }} />
-            {/* Barre per mostrare la media */}
-            <Bar dataKey="avg" fill="#3b82f6" name="Età Media" barSize={40} />
-          </ComposedChart>
-        </ResponsiveContainer>
+        
+        {/* Box Plot SVG */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '20px', overflowX: 'auto', position: 'relative' }}>
+          <svg 
+            id="age-boxplot-svg" 
+            width={Math.max(1000, ageData.length * 350)} 
+            height={550} 
+            style={{ border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#f8fafc' }}
+          >
+            {(() => {
+              const padding = 80
+              const boxWidth = 160
+              const height = 550
+              const width = Math.max(1000, ageData.length * 350)
+              const groupSpacing = width / (ageData.length + 1)
+
+              // Calcola scala Y globale per tutti i dati
+              const allValues = ageData.flatMap(d => [d.min, d.max, d.q1, d.q3, d.median, ...(d.outliers || [])])
+              const dataMin = Math.min(...allValues)
+              const dataMax = Math.max(...allValues)
+              const range = dataMax - dataMin
+              const yMin = Math.max(0, dataMin - range * 0.1)
+              const yMax = dataMax + range * 0.1
+              const yScale = (value) => height - padding - ((value - yMin) / (yMax - yMin)) * (height - 2 * padding)
+
+              const colors = [COLORS.students, COLORS.teachers_active, COLORS.teachers_training]
+
+              return (
+                <>
+                  {/* Griglia orizzontale - ogni 4 anni */}
+                  {(() => {
+                    const minAge = Math.floor(yMin / 4) * 4 // Arrotonda a multiplo di 4
+                    const maxAge = Math.ceil(yMax / 4) * 4
+                    const gridLines = []
+                    for (let age = minAge; age <= maxAge; age += 4) {
+                      const y = yScale(age)
+                      gridLines.push(
+                        <g key={age}>
+                          <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="#e2e8f0" strokeDasharray="3 3" />
+                          <text x={padding - 10} y={y + 5} textAnchor="end" fontSize="13" fill="#64748b">{age}</text>
+                        </g>
+                      )
+                    }
+                    return gridLines
+                  })()}
+
+                  {/* Label asse Y */}
+                  <text x={20} y={height / 2} textAnchor="middle" fontSize="14" fontWeight="600" fill="#64748b" transform={`rotate(-90, 20, ${height / 2})`}>
+                    Età (anni)
+                  </text>
+
+                  {/* Box plots per ogni gruppo */}
+                  {ageData.map((group, idx) => {
+                    const centerX = groupSpacing * (idx + 1)
+                    const color = colors[idx]
+                    const fillColor = color + '30' // aggiunge trasparenza
+                    const isHovered = hoveredBox === idx
+
+                    return (
+                      <g key={idx}>
+                        {/* Area invisibile per hover più ampia */}
+                        <rect
+                          x={centerX - boxWidth}
+                          y={padding}
+                          width={boxWidth * 2}
+                          height={height - 2 * padding}
+                          fill="transparent"
+                          style={{ cursor: 'pointer' }}
+                          onMouseEnter={(e) => {
+                            setHoveredBox(idx)
+                            setTooltipPos({ x: e.clientX, y: e.clientY })
+                          }}
+                          onMouseMove={(e) => {
+                            setTooltipPos({ x: e.clientX, y: e.clientY })
+                          }}
+                          onMouseLeave={() => setHoveredBox(null)}
+                        />
+
+                        {/* Whisker inferiore */}
+                        <line x1={centerX} y1={yScale(group.whiskerLow)} x2={centerX} y2={yScale(group.q1)} stroke={color} strokeWidth={isHovered ? 4 : 3} />
+                        <line x1={centerX - 25} y1={yScale(group.whiskerLow)} x2={centerX + 25} y2={yScale(group.whiskerLow)} stroke={color} strokeWidth={isHovered ? 4 : 3} />
+
+                        {/* Box (Q1-Q3) */}
+                        <rect
+                          x={centerX - boxWidth / 2}
+                          y={yScale(group.q3)}
+                          width={boxWidth}
+                          height={yScale(group.q1) - yScale(group.q3)}
+                          fill={isHovered ? (color + '50') : fillColor}
+                          stroke={color}
+                          strokeWidth={isHovered ? 4 : 3}
+                          rx={4}
+                          style={{ pointerEvents: 'none' }}
+                        />
+
+                        {/* Mediana */}
+                        <line
+                          x1={centerX - boxWidth / 2}
+                          y1={yScale(group.median)}
+                          x2={centerX + boxWidth / 2}
+                          y2={yScale(group.median)}
+                          stroke="#ef4444"
+                          strokeWidth={isHovered ? 5 : 4}
+                          style={{ pointerEvents: 'none' }}
+                        />
+
+                        {/* Media (rombo) */}
+                        <g transform={`translate(${centerX}, ${yScale(group.avg)}) rotate(45)`} style={{ pointerEvents: 'none' }}>
+                          <rect x={isHovered ? -8 : -7} y={isHovered ? -8 : -7} width={isHovered ? 16 : 14} height={isHovered ? 16 : 14} fill="#0f172a" />
+                        </g>
+
+                        {/* Whisker superiore */}
+                        <line x1={centerX} y1={yScale(group.q3)} x2={centerX} y2={yScale(group.whiskerHigh)} stroke={color} strokeWidth={isHovered ? 4 : 3} style={{ pointerEvents: 'none' }} />
+                        <line x1={centerX - 25} y1={yScale(group.whiskerHigh)} x2={centerX + 25} y2={yScale(group.whiskerHigh)} stroke={color} strokeWidth={isHovered ? 4 : 3} style={{ pointerEvents: 'none' }} />
+
+                        {/* Outliers */}
+                        {(group.outliers || []).map((outlier, i) => (
+                          <circle key={i} cx={centerX + (i % 3 - 1) * 10} cy={yScale(outlier)} r={5} fill="#dc2626" stroke="white" strokeWidth={2} />
+                        ))}
+
+                        {/* Label categoria */}
+                        <text x={centerX} y={height - padding + 30} textAnchor="middle" fontSize="14" fontWeight="600" fill="#1e293b">
+                          {group.category}
+                        </text>
+                        <text x={centerX} y={height - padding + 50} textAnchor="middle" fontSize="12" fill="#64748b">
+                          (n={group.total})
+                        </text>
+                      </g>
+                    )
+                  })}
+                </>
+              )
+            })()}
+          </svg>
+          
+          {/* Tooltip interattivo */}
+          {hoveredBox !== null && (
+            <div style={{
+              position: 'fixed',
+              left: `${tooltipPos.x + 15}px`,
+              top: `${tooltipPos.y + 15}px`,
+              backgroundColor: 'white',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #3b82f6',
+              boxShadow: '0 8px 16px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+              pointerEvents: 'none',
+              minWidth: '250px'
+            }}>
+              <p style={{ margin: '0 0 12px 0', fontWeight: 'bold', fontSize: '1.1em', color: '#1e293b' }}>
+                {ageData[hoveredBox].category}
+              </p>
+              <div style={{ fontSize: '0.9em', color: '#475569', lineHeight: '1.8' }}>
+                <p style={{ margin: '6px 0' }}><strong>Campione:</strong> {ageData[hoveredBox].total} rispondenti</p>
+                <p style={{ margin: '6px 0' }}><strong>Media:</strong> {ageData[hoveredBox].avg} anni</p>
+                <p style={{ margin: '6px 0' }}><strong>Mediana:</strong> {ageData[hoveredBox].median} anni</p>
+                <p style={{ margin: '6px 0' }}><strong>Q1 (25%):</strong> {ageData[hoveredBox].q1} anni</p>
+                <p style={{ margin: '6px 0' }}><strong>Q3 (75%):</strong> {ageData[hoveredBox].q3} anni</p>
+                <p style={{ margin: '6px 0' }}><strong>IQR:</strong> {ageData[hoveredBox].q3 - ageData[hoveredBox].q1} anni</p>
+                <p style={{ margin: '6px 0' }}><strong>Baffi:</strong> {ageData[hoveredBox].whiskerLow} - {ageData[hoveredBox].whiskerHigh} anni</p>
+                <p style={{ margin: '6px 0' }}><strong>Range:</strong> {ageData[hoveredBox].min} - {ageData[hoveredBox].max} anni</p>
+                {ageData[hoveredBox].outliers && ageData[hoveredBox].outliers.length > 0 && (
+                  <p style={{ margin: '8px 0 0 0', padding: '8px', backgroundColor: '#fef2f2', borderRadius: '4px', color: '#dc2626' }}>
+                    <strong>Outliers ({ageData[hoveredBox].outliers.length}):</strong> {ageData[hoveredBox].outliers.join(', ')}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Pulsanti Download */}
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            onClick={() => downloadPNG('age-boxplot-svg', 'età-boxplot.png')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.9em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Icons.Save className="w-4 h-4" />
+            Scarica PNG
+          </button>
+          <button
+            onClick={() => downloadSVG('age-boxplot-svg', 'età-boxplot.svg')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.9em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Icons.Save className="w-4 h-4" />
+            Scarica SVG
+          </button>
+          <button
+            onClick={() => {
+              const csvData = ageData.map(g => ({
+                Categoria: g.category,
+                Campione: g.total,
+                Media: g.avg,
+                Mediana: g.median,
+                Q1: g.q1,
+                Q3: g.q3,
+                Min: g.min,
+                Max: g.max,
+                'Whisker Basso': g.whiskerLow,
+                'Whisker Alto': g.whiskerHigh,
+                Outliers: (g.outliers || []).join('; ')
+              }))
+              downloadCSV(csvData, Object.keys(csvData[0]), 'età-statistiche.csv')
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#f59e0b',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.9em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Icons.Save className="w-4 h-4" />
+            Scarica CSV
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '20px', marginTop: '20px', fontSize: '0.85em', color: '#475569', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '18px', height: '12px', backgroundColor: 'rgba(59, 130, 246, 0.2)', border: `2px solid #3b82f6`, borderRadius: '2px', display: 'inline-block' }}></span>
+            Quartile Q1-Q3
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '18px', height: '3px', backgroundColor: '#ef4444', display: 'inline-block' }}></span>
+            Mediana
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '14px', height: '14px', backgroundColor: '#0f172a', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
+            Media
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '10px', height: '10px', backgroundColor: '#dc2626', borderRadius: '50%', display: 'inline-block' }}></span>
+            Outlier (valore anomalo)
+          </div>
+        </div>
+
+        {/* Tabella Dati Età */}
+        <div style={{ marginTop: '25px', overflowX: 'auto' }}>
+          <h4 style={{ marginBottom: '15px', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Icons.List className="w-5 h-5" />
+            Tabella Dati Statistici Età
+          </h4>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9' }}>
+                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: '600', color: '#1e293b' }}>Categoria</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600', color: '#1e293b' }}>Campione</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600', color: '#1e293b' }}>Media</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600', color: '#1e293b' }}>Mediana</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600', color: '#1e293b' }}>Q1</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600', color: '#1e293b' }}>Q3</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600', color: '#1e293b' }}>IQR</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600', color: '#1e293b' }}>Min</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600', color: '#1e293b' }}>Max</th>
+                <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600', color: '#1e293b' }}>Outliers</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ageData.map((group, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                  <td style={{ padding: '12px', fontWeight: '600', color: '#1e293b' }}>{group.category}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>{group.total}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>{group.avg}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>{group.median}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>{group.q1}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>{group.q3}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>{group.q3 - group.q1}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>{group.min}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>{group.max}</td>
+                  <td style={{ padding: '12px', textAlign: 'center', color: group.outliers && group.outliers.length > 0 ? '#dc2626' : '#16a34a', fontWeight: '500' }}>
+                    {group.outliers && group.outliers.length > 0 ? `${group.outliers.length} (${group.outliers.join(', ')})` : 'Nessuno'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {/* Report Outliers */}
         <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa' }}>
@@ -254,12 +702,12 @@ function RespondentProfiles() {
             {ageData.map((group, idx) => {
               const mean = group.avg
               const range = group.max - group.min
-              const iqr = range * 0.5 // Stima approssimativa dell'IQR
-              const lowerBound = mean - (1.5 * iqr)
-              const upperBound = mean + (1.5 * iqr)
-              const hasLowerOutliers = group.min < lowerBound
-              const hasUpperOutliers = group.max > upperBound
-              const hasOutliers = hasLowerOutliers || hasUpperOutliers
+              const iqr = (group.q3 - group.q1) || 0
+              const lowerBound = group.whiskerLow ?? group.min
+              const upperBound = group.whiskerHigh ?? group.max
+              const lowerOutliers = (group.outliers || []).filter(value => value < lowerBound)
+              const upperOutliers = (group.outliers || []).filter(value => value > upperBound)
+              const hasOutliers = lowerOutliers.length > 0 || upperOutliers.length > 0
 
               return (
                 <div key={idx} style={{
@@ -278,14 +726,20 @@ function RespondentProfiles() {
                   </div>
                   <div style={{ fontSize: '0.85em', color: '#475569', lineHeight: '1.6' }}>
                     <p style={{ margin: '5px 0' }}>Media: <strong>{mean}</strong> anni</p>
-                    <p style={{ margin: '5px 0' }}>Range: {group.min} - {group.max} anni</p>
-                    <p style={{ margin: '5px 0' }}>Ampiezza: <strong>{range}</strong> anni</p>
+                    <p style={{ margin: '5px 0' }}>Mediana: <strong>{group.median}</strong> anni</p>
+                    <p style={{ margin: '5px 0' }}>Baffi IQR: {lowerBound} - {upperBound} anni</p>
+                    <p style={{ margin: '5px 0' }}>Range complessivo: {group.min} - {group.max} anni</p>
+                    <p style={{ margin: '5px 0' }}>Ampiezza: <strong>{range}</strong> anni (IQR: {iqr})</p>
                     {hasOutliers ? (
                       <div style={{ marginTop: '10px', padding: '8px', backgroundColor: '#fee2e2', borderRadius: '4px', fontSize: '0.8em' }}>
                         <Icons.AlertCircle className="w-4 h-4" style={{ display: 'inline', marginRight: '4px', color: '#dc2626' }} />
                         <strong>Outliers rilevati:</strong>
-                        {hasLowerOutliers && <p style={{ margin: '4px 0 0 20px' }}>Valori molto bassi (min: {group.min})</p>}
-                        {hasUpperOutliers && <p style={{ margin: '4px 0 0 20px' }}>Valori molto alti (max: {group.max})</p>}
+                        {lowerOutliers.length > 0 && (
+                          <p style={{ margin: '4px 0 0 20px' }}>Bassi: {lowerOutliers.join(', ')}</p>
+                        )}
+                        {upperOutliers.length > 0 && (
+                          <p style={{ margin: '4px 0 0 20px' }}>Alti: {upperOutliers.join(', ')}</p>
+                        )}
                       </div>
                     ) : (
                       <div style={{ marginTop: '10px', padding: '8px', backgroundColor: '#dcfce7', borderRadius: '4px', fontSize: '0.8em', color: '#166534' }}>
@@ -396,8 +850,75 @@ function RespondentProfiles() {
       {renderExpandableSection('students', 'Studenti', COLORS.students, data.students, Icons.Student)}
       {renderExpandableSection('teachers_active', 'Insegnanti Attivi', COLORS.teachers_active, data.teachers_active, Icons.Teacher)}
       {renderExpandableSection('teachers_training', 'Insegnanti in Formazione', COLORS.teachers_training, data.teachers_training, Icons.Teacher)}
+      {renderExpandableSection('teachers_total', 'Insegnanti Totali', '#8b5cf6', mergeTeachersData(data.teachers_active, data.teachers_training), Icons.Teacher)}
     </div>
   )
+
+  function mergeTeachersData(activeData, trainingData) {
+    // Funzione helper per sommare distribuzioni
+    const mergeDistribution = (dist1, dist2) => {
+      const merged = { ...dist1 }
+      Object.entries(dist2).forEach(([key, value]) => {
+        merged[key] = (merged[key] || 0) + value
+      })
+      return merged
+    }
+
+    // Calcola totale
+    const total = activeData.total + trainingData.total
+
+    // Merge età
+    const allAges = [
+      ...(activeData.age?.outliers || []),
+      ...(trainingData.age?.outliers || [])
+    ]
+    const mergedAge = {
+      avg: ((activeData.age?.avg || 0) * activeData.total + (trainingData.age?.avg || 0) * trainingData.total) / total,
+      min: Math.min(activeData.age?.min || 0, trainingData.age?.min || 0),
+      max: Math.max(activeData.age?.max || 0, trainingData.age?.max || 0),
+      q1: ((activeData.age?.q1 || 0) * activeData.total + (trainingData.age?.q1 || 0) * trainingData.total) / total,
+      median: ((activeData.age?.median || 0) * activeData.total + (trainingData.age?.median || 0) * trainingData.total) / total,
+      q3: ((activeData.age?.q3 || 0) * activeData.total + (trainingData.age?.q3 || 0) * trainingData.total) / total,
+      whisker_low: Math.min(activeData.age?.whisker_low || 0, trainingData.age?.whisker_low || 0),
+      whisker_high: Math.max(activeData.age?.whisker_high || 0, trainingData.age?.whisker_high || 0),
+      outliers: allAges,
+      total: total,
+      ranges: mergeDistribution(activeData.age?.ranges || {}, trainingData.age?.ranges || {})
+    }
+
+    // Merge genere
+    const mergedGender = {
+      distribution: mergeDistribution(activeData.gender?.distribution || {}, trainingData.gender?.distribution || {}),
+      total: total
+    }
+
+    // Merge educazione
+    const mergedEducation = {
+      distribution: mergeDistribution(activeData.education?.distribution || {}, trainingData.education?.distribution || {}),
+      total: total
+    }
+
+    // Merge scuola/istituto
+    const mergedSchool = {
+      distribution: mergeDistribution(activeData.school?.distribution || {}, trainingData.school?.distribution || {}),
+      total: total
+    }
+
+    // Merge STEM
+    const mergedStem = {
+      distribution: mergeDistribution(activeData.stem?.distribution || {}, trainingData.stem?.distribution || {}),
+      total: total
+    }
+
+    return {
+      total: total,
+      age: mergedAge,
+      gender: mergedGender,
+      education: mergedEducation,
+      school: mergedSchool,
+      stem: mergedStem
+    }
+  }
 
   function renderExpandableSection(key, title, color, profileData, Icon) {
     const isExpanded = expandedSections[key]
@@ -542,6 +1063,58 @@ function RespondentProfiles() {
               <Bar dataKey="count" fill={COLORS[category]} />
             </BarChart>
           </ResponsiveContainer>
+
+          {/* Tabella Fasce Età */}
+          <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+            <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella Dati Fasce Età</h5>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9' }}>
+                  <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Fascia Età</th>
+                  <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Numero</th>
+                  <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Percentuale</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ageRangesData.map((item, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                    <td style={{ padding: '10px', fontWeight: '500', color: '#1e293b' }}>{item.range} anni</td>
+                    <td style={{ padding: '10px', textAlign: 'center', color: '#64748b' }}>{item.count}</td>
+                    <td style={{ padding: '10px', textAlign: 'center', color: '#64748b' }}>{item.percentage}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pulsante Download CSV Fasce Età */}
+          <div style={{ marginTop: '10px' }}>
+            <button
+              onClick={() => {
+                const csvData = ageRangesData.map(item => ({
+                  'Fascia Età': item.range + ' anni',
+                  'Numero': item.count,
+                  'Percentuale': item.percentage + '%'
+                }))
+                downloadCSV(csvData, ['Fascia Età', 'Numero', 'Percentuale'], `fasce-età-${category}.csv`)
+              }}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: COLORS[category],
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.85em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Icons.Save className="w-4 h-4" />
+              Scarica CSV
+            </button>
+          </div>
         </div>
 
         {/* Titoli di Studio */}
@@ -597,6 +1170,55 @@ function RespondentProfiles() {
               />
             </BarChart>
           </ResponsiveContainer>
+
+          {/* Tabella Titoli di Studio */}
+          <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+            <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella Dati Titoli di Studio</h5>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9' }}>
+                  <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Titolo di Studio</th>
+                  <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Numero</th>
+                </tr>
+              </thead>
+              <tbody>
+                {educationData.map((item, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                    <td style={{ padding: '10px', color: '#1e293b' }}>{item.fullName}</td>
+                    <td style={{ padding: '10px', textAlign: 'center', color: '#64748b', fontWeight: '600' }}>{item.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pulsante Download CSV Titoli di Studio */}
+          <div style={{ marginTop: '10px' }}>
+            <button
+              onClick={() => {
+                const csvData = educationData.map(item => ({
+                  'Titolo di Studio': item.fullName,
+                  'Numero': item.value
+                }))
+                downloadCSV(csvData, ['Titolo di Studio', 'Numero'], `titoli-studio-${category}.csv`)
+              }}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: COLORS[category],
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.85em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Icons.Save className="w-4 h-4" />
+              Scarica CSV
+            </button>
+          </div>
         </div>
 
         {/* Campi specifici per categoria */}
@@ -686,6 +1308,65 @@ function RespondentProfiles() {
                     />
                   </BarChart>
                 </ResponsiveContainer>
+              )
+            })()}
+
+            {/* Tabella Scuola o Istituto */}
+            {(() => {
+              const schoolTypeData = Object.entries(profileData.school_type.distribution || {})
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value)
+              
+              return (
+                <>
+                  <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                    <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella Dati Scuola/Istituto</h5>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f1f5f9' }}>
+                          <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Scuola/Istituto</th>
+                          <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Numero</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {schoolTypeData.map((item, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                            <td style={{ padding: '10px', color: '#1e293b' }}>{item.name}</td>
+                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b', fontWeight: '600' }}>{item.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pulsante Download CSV Scuola */}
+                  <div style={{ marginTop: '10px' }}>
+                    <button
+                      onClick={() => {
+                        const csvData = schoolTypeData.map(item => ({
+                          'Scuola/Istituto': item.name,
+                          'Numero': item.value
+                        }))
+                        downloadCSV(csvData, ['Scuola/Istituto', 'Numero'], 'scuole-istituti-studenti.csv')
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: COLORS.students,
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.85em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Icons.Save className="w-4 h-4" />
+                      Scarica CSV
+                    </button>
+                  </div>
+                </>
               )
             })()}
           </div>
@@ -783,6 +1464,65 @@ function RespondentProfiles() {
                 </ResponsiveContainer>
               )
             })()}
+
+            {/* Tabella Scuola/Istituto Insegnanti */}
+            {(() => {
+              const schoolLevelData = Object.entries(profileData.school_level.distribution || {})
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value)
+              
+              return (
+                <>
+                  <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                    <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella Dati Scuola/Istituto</h5>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f1f5f9' }}>
+                          <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Scuola/Istituto</th>
+                          <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Numero</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {schoolLevelData.map((item, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                            <td style={{ padding: '10px', color: '#1e293b' }}>{item.name}</td>
+                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b', fontWeight: '600' }}>{item.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pulsante Download CSV Scuola Insegnanti */}
+                  <div style={{ marginTop: '10px' }}>
+                    <button
+                      onClick={() => {
+                        const csvData = schoolLevelData.map(item => ({
+                          'Scuola/Istituto': item.name,
+                          'Numero': item.value
+                        }))
+                        downloadCSV(csvData, ['Scuola/Istituto', 'Numero'], `scuole-istituti-${category}.csv`)
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: COLORS[category],
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.85em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Icons.Save className="w-4 h-4" />
+                      Scarica CSV
+                    </button>
+                  </div>
+                </>
+              )
+            })()}
           </div>
         )}
 
@@ -872,6 +1612,71 @@ function RespondentProfiles() {
                     ))}
                   </div>
                 </div>
+              )
+            })()}
+
+            {/* Tabella STEM vs Umanistica */}
+            {(() => {
+              const subjectTypeData = Object.entries(profileData.subject_type.distribution || {})
+                .map(([name, value]) => ({
+                  name: name,
+                  value,
+                  percentage: ((value / profileData.subject_type.total) * 100).toFixed(1)
+                }))
+              
+              return (
+                <>
+                  <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                    <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella Dati STEM vs Umanistica</h5>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f1f5f9' }}>
+                          <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Tipo Materia</th>
+                          <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Numero</th>
+                          <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Percentuale</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subjectTypeData.map((item, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                            <td style={{ padding: '10px', fontWeight: '500', color: '#1e293b' }}>{item.name}</td>
+                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b', fontWeight: '600' }}>{item.value}</td>
+                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b' }}>{item.percentage}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pulsante Download CSV STEM */}
+                  <div style={{ marginTop: '10px' }}>
+                    <button
+                      onClick={() => {
+                        const csvData = subjectTypeData.map(item => ({
+                          'Tipo Materia': item.name,
+                          'Numero': item.value,
+                          'Percentuale': item.percentage + '%'
+                        }))
+                        downloadCSV(csvData, ['Tipo Materia', 'Numero', 'Percentuale'], `stem-umanistica-${category}.csv`)
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: COLORS[category],
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.85em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Icons.Save className="w-4 h-4" />
+                      Scarica CSV
+                    </button>
+                  </div>
+                </>
               )
             })()}
           </div>

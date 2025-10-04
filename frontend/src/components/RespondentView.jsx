@@ -147,7 +147,8 @@ function RespondentView() {
                 border: '1px solid #cbd5e1',
                 borderRadius: '6px',
                 fontSize: '0.875rem',
-                backgroundColor: 'white'
+                backgroundColor: 'white',
+                color: '#1e293b'
               }}
             >
               <option value="all">Tutti</option>
@@ -173,7 +174,8 @@ function RespondentView() {
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   fontSize: '0.875rem',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  color: '#1e293b'
                 }}
               >
                 <option value="all">Tutte le categorie ({allResponses.length})</option>
@@ -202,7 +204,9 @@ function RespondentView() {
                   padding: '8px 12px',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
-                  fontSize: '0.875rem'
+                  fontSize: '0.875rem',
+                  backgroundColor: 'white',
+                  color: '#1e293b'
                 }}
               />
               <button
@@ -275,8 +279,7 @@ function RespondentView() {
                       <button
                         key={idx}
                         onClick={() => {
-                          setRespondentCode(resp.code)
-                          searchRespondent()
+                          searchRespondent(resp.code)
                         }}
                         style={{
                           padding: '6px 12px',

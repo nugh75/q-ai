@@ -1,9 +1,68 @@
 import { useState, useEffect, useCallback } from 'react'
+import { toPng } from 'html-to-image'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import { Icons } from './Icons'
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
+
+// Funzioni di utilità per esportazione
+const downloadPNG = async (containerId, filename) => {
+  const container = document.getElementById(containerId)
+  if (!container) {
+    console.error('Container non trovato:', containerId)
+    return
+  }
+
+  try {
+    const pixelRatio = Math.max(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
+    const dataUrl = await toPng(container, {
+      cacheBust: true,
+      pixelRatio,
+      backgroundColor: '#ffffff',
+      filter: (node) => {
+        if (!node || !node.classList) return true
+        return !node.classList.contains('recharts-tooltip-wrapper')
+      }
+    })
+
+    const link = document.createElement('a')
+    link.href = dataUrl
+    link.download = filename
+    link.click()
+  } catch (err) {
+    console.error('Errore durante l\'esportazione del grafico', err)
+  }
+}
+
+const downloadCSV = (data, filename) => {
+  if (!data || data.length === 0) return
+  
+  // Estrai le chiavi del primo oggetto come headers
+  const headers = Object.keys(data[0])
+  
+  const csv = [
+    headers.join(','),
+    ...data.map(row => headers.map(h => {
+      let value = row[h]
+      // Gestisci valori null/undefined
+      if (value === null || value === undefined) value = ''
+      // Escape virgolette e wrappa in quotes se contiene virgole, newline o quote
+      if (typeof value === 'string' && (value.includes(',') || value.includes('\n') || value.includes('"'))) {
+        value = `"${value.replace(/"/g, '""')}"`
+      }
+      return value
+    }).join(','))
+  ].join('\n')
+  
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 function QuestionStats({ question, teacherFilter }) {
   const [stats, setStats] = useState(null)
@@ -48,6 +107,30 @@ function QuestionStats({ question, teacherFilter }) {
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
+
+  // Funzioni per esportazione
+  const handleExportChart = () => {
+    const questionText = question.question_text.substring(0, 50).replace(/[^a-zA-Z0-9]/g, '_')
+    const filename = `grafico_q${question.column_index}_${questionText}.png`
+    downloadPNG('chart-container-' + question.column_index, filename)
+  }
+
+  const handleExportTable = () => {
+    if (!stats || !stats.distribution) return
+    
+    const questionText = question.question_text.substring(0, 50).replace(/[^a-zA-Z0-9]/g, '_')
+    const filename = `dati_q${question.column_index}_${questionText}.csv`
+    
+    // Prepara dati per CSV
+    const csvData = stats.distribution.map((item, index) => ({
+      '#': index + 1,
+      'Opzione': item.option || item.answer || item.value || item.range || '',
+      'Conteggio': item.count,
+      'Percentuale': item.percentage
+    }))
+    
+    downloadCSV(csvData, filename)
+  }
 
   if (loading) {
     return (
@@ -684,6 +767,56 @@ function QuestionStats({ question, teacherFilter }) {
             {stats.response_count} risposte
           </span>
         </div>
+        <div className="stats-actions" style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={handleExportChart}
+            className="export-btn"
+            title="Esporta grafico come PNG"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 1rem',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
+          >
+            <Icons.Image className="w-4 h-4" />
+            <span>Esporta Grafico</span>
+          </button>
+          <button
+            onClick={handleExportTable}
+            className="export-btn"
+            title="Esporta tabella come CSV"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 1rem',
+              backgroundColor: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
+          >
+            <Icons.Download className="w-4 h-4" />
+            <span>Esporta Dati</span>
+          </button>
+        </div>
       </div>
 
       <div className="stats-body">
@@ -708,7 +841,7 @@ function QuestionStats({ question, teacherFilter }) {
           </div>
         </div>
 
-        <div className="chart-container">
+        <div className="chart-container" id={`chart-container-${question.column_index}`}>
           {renderChart()}
         </div>
 

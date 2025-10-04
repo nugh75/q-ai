@@ -150,52 +150,65 @@ def normalize_subject_area(raw_value: str) -> str:
 
     # STEP 2: Gestisci casi speciali comuni
 
-    # Scuola dell'Infanzia
+    # Scuola dell'Infanzia - RAGGRUPPA TUTTE LE VARIANTI
     if re.search(r'\binfanzia\b', normalized):
-        if re.search(r'\baaaa\b|aa\s*aa', normalized):
-            return "AAAA - Scuola dell'Infanzia"
-        if re.search(r'\badaa\b|ad\s*aa', normalized):
-            return "ADAA - Sostegno Infanzia"
-        if 'sostegno' in normalized:
-            return "Sostegno - Scuola dell'Infanzia"
+        # Tutte le varianti (AAAA, ADAA, sostegno, ecc.) diventano "Scuola dell'Infanzia"
         return "Scuola dell'Infanzia"
 
-    # Scuola Primaria
+    # Scuola Primaria - RAGGRUPPA TUTTE LE VARIANTI
     if re.search(r'\bprimaria\b', normalized):
-        if 'sostegno' in normalized:
-            return "Sostegno - Scuola Primaria"
-        if any(x in normalized for x in ['matematica', 'scienze']) and 'tutte' not in normalized:
-            return "Scuola Primaria - Matematica/Scienze"
-        if any(x in normalized for x in ['italiano', 'linguistico']):
-            return "Scuola Primaria - Italiano/Linguistico"
-        if 'i 5 campi' in normalized or 'cinque campi' in normalized or '5 campi' in normalized:
-            return "Scuola Primaria - 5 Campi di Esperienza"
-        if 'tutte le materie' in normalized:
-            return "Scuola Primaria - Tutte le materie"
+        # Tutte le varianti (EEEE, sostegno, matematica/scienze, ecc.) diventano "Scuola Primaria"
         return "Scuola Primaria"
-
-    # Sostegno generico
-    if normalized in ['sostegno', 'sostegno didattico', 'docente di sostegno', 'insegnante di sostegno']:
-        return 'Sostegno Didattico'
-    if normalized.startswith('sostegno') and 'adss' not in normalized and 'primaria' not in normalized and 'infanzia' not in normalized:
-        return 'Sostegno Didattico'
-    if re.search(r'\badss\b|ad\s*ss', normalized):
-        return 'ADSS - Sostegno Secondaria'
-    if 'admm' in normalized and 'sostegno' in normalized:
-        return 'ADMM - Sostegno Secondaria I grado'
-
+    
     # EEEE (Scuola Primaria)
     if re.search(r'\bee+\b', normalized):
-        return "EEEE - Scuola Primaria"
+        return "Scuola Primaria"
+
+    # Sostegno - RAGGRUPPA TUTTO (ADSS, ADMM, ADAA, ecc.)
+    if 'sostegno' in normalized or re.search(r'\bad[a-z]{2}\b|ad\s*[a-z]{2}', normalized):
+        return 'Sostegno Didattico'
 
     # SSD universitari (Settore Scientifico Disciplinare)
-    # Es: "MAT/01 LOGICA MATEMATICA" -> "MAT/01"
-    ssd_match = re.match(r'^([A-Z]+[-/][A-Z0-9]+)', value, re.IGNORECASE)
+    # Es: "MAT/01 LOGICA MATEMATICA" -> "Matematica"
+    # Es: "M-PED/01" -> "Pedagogia", "SECS-P/01" -> "Economia"
+    
+    # Mappatura sigle SSD -> nomi estesi (28 raggruppamenti disciplinari ufficiali)
+    SSD_NAMES = {
+        'MAT': 'Matematica',
+        'INF': 'Informatica',
+        'FIS': 'Fisica',
+        'CHIM': 'Chimica',
+        'GEO': 'Geoscienze',
+        'BIO': 'Biologia',
+        'MED': 'Medicina',
+        'AGR': 'Agraria',
+        'VET': 'Veterinaria',
+        'ICAR': 'Ingegneria Civile e Architettura',
+        'ING-IND': 'Ingegneria Industriale',
+        'ING-INF': 'Ingegneria dell\'Informazione',
+        'L-ANT': 'Scienze dell\'Antichità',
+        'L-ART': 'Storia dell\'Arte e Spettacolo',
+        'L-FIL-LET': 'Filologia e Letteratura',
+        'L-LIN': 'Lingue e Letterature Straniere',
+        'L-OR': 'Studi Orientali',
+        'M-FIL': 'Filosofia',
+        'M-STO': 'Storia',
+        'M-PED': 'Pedagogia',
+        'M-PSI': 'Psicologia',
+        'M-GGR': 'Geografia',
+        'M-DEA': 'Antropologia',
+        'M-EDF': 'Educazione Fisica',
+        'IUS': 'Giurisprudenza',
+        'SECS-P': 'Economia',
+        'SECS-S': 'Statistica',
+        'SPS': 'Scienze Politiche e Sociali'
+    }
+    
+    # Pattern completo: cattura AGR, MAT, BIO, M-PED, L-LIN, SECS-P, ING-IND, ecc.
+    ssd_match = re.match(r'^([A-Z]+(?:-[A-Z]+)*)[-/]\d+', value, re.IGNORECASE)
     if ssd_match:
-        ssd_code = ssd_match.group(1).upper()
-        # Normalizza separatore: sempre /
-        ssd_code = ssd_code.replace('-', '/')
-        return ssd_code
+        area = ssd_match.group(1).upper()
+        return SSD_NAMES.get(area, area)  # Ritorna il nome esteso o la sigla se non trovata
 
     # Casi specifici testuali
     if 'i 5 campi' in normalized or '5 campi di esperienza' in normalized:
@@ -242,35 +255,29 @@ class QuestionStatsService:
     }
     
     TEACHER_FIELD_MAPPING = {
-        1: 'consent',
-        2: 'age',
-        3: 'gender',
-        4: 'currently_teaching',
-        5: 'qualification',
+        2: 'currently_teaching',
+        3: 'age',
+        4: 'gender',
+        5: 'education_level',
         6: 'school_level',
-        7: 'school_location',
+        7: 'subject_type',
         8: 'subject_area',
-        9: 'subject_type',
-        10: 'classes_taught',
-        11: 'taught_school_levels',
-        12: 'hours_ai_training',
-        13: 'practical_competence',
-        14: 'theoretical_competence',
-        15: 'ai_change_teaching',
-        16: 'training_adequacy',
-        17: 'trust_integration',
-        18: 'institution_preparation',
-        19: 'concern_ai_class',
-        20: 'concern_ai_colleagues',
-        21: 'uses_ai_daily',
-        22: 'hours_daily',
-        23: 'uses_ai_teaching',
-        24: 'hours_teaching',
-        25: 'hours_lesson_plan',
-        26: 'hours_saved',
-        27: 'ai_tools',
-        28: 'ai_purposes',
-        29: 'not_use_for',
+        9: 'practical_competence',
+        10: 'theoretical_competence',
+        11: 'ai_change_teaching',
+        12: 'ai_change_my_teaching',
+        13: 'training_adequacy',
+        14: 'trust_integration',
+        15: 'trust_students_responsible',
+        16: 'concern_ai_education',
+        17: 'concern_ai_students',
+        19: 'uses_ai_daily',
+        20: 'hours_daily',
+        22: 'uses_ai_teaching',
+        23: 'hours_teaching_ai',
+        24: 'hours_lesson_planning',
+        25: 'ai_tools',
+        26: 'ai_purposes',
     }
     
     def __init__(self, db: Session):
@@ -584,6 +591,11 @@ class QuestionStatsService:
         # Applica normalizzazione per subject_area (domanda 8) per consolidare duplicati
         if field_name == 'subject_area':
             values = [normalize_subject_area(v) for v in values]
+        
+        # Applica normalizzazione per school_level (domanda 6 insegnanti) per consolidare varianti
+        if field_name == 'school_level':
+            from .main import normalize_school_level
+            values = [normalize_school_level(v) for v in values]
         
         # Conta occorrenze di ogni opzione (NON dividere per virgole)
         distribution = Counter(values)

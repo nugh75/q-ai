@@ -12,6 +12,7 @@ from .statistics import InferentialStats, CorrelationAnalysis, RegressionAnalysi
 from typing import Optional, List, Dict, Any
 import logging
 import os
+import statistics
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -1468,11 +1469,24 @@ def get_demographics_profiles(db: Session = Depends(get_db)):
         ).all()
         
         def calculate_age_distribution(respondents):
-            """Calcola distribuzione età con fasce"""
-            ages = [r.age for r in respondents if r.age]
+            """Calcola distribuzione età con fasce e statistiche descrittive"""
+            ages = sorted([r.age for r in respondents if r.age is not None])
             if not ages:
-                return {"ranges": {}, "avg": 0, "min": 0, "max": 0}
-            
+                return {
+                    "ranges": {},
+                    "avg": 0,
+                    "min": 0,
+                    "max": 0,
+                    "total": 0,
+                    "median": 0,
+                    "q1": 0,
+                    "q3": 0,
+                    "iqr": 0,
+                    "whisker_low": 0,
+                    "whisker_high": 0,
+                    "outliers": []
+                }
+
             # Fasce età
             ranges = {
                 "18-25": len([a for a in ages if 18 <= a <= 25]),
@@ -1481,13 +1495,40 @@ def get_demographics_profiles(db: Session = Depends(get_db)):
                 "46-55": len([a for a in ages if 46 <= a <= 55]),
                 "56+": len([a for a in ages if a >= 56])
             }
-            
+
+            # Quartili e outlier (metodo IQR)
+            if len(ages) >= 4:
+                quartiles = statistics.quantiles(ages, n=4, method="inclusive")
+                q1, q2, q3 = quartiles[0], statistics.median(ages), quartiles[2]
+            else:
+                # Con meno di 4 valori assumiamo Q1/Q3 uguali alla mediana per evitare valori incoerenti
+                q2 = statistics.median(ages)
+                q1 = min(ages)
+                q3 = max(ages)
+
+            iqr = q3 - q1
+            lower_fence = q1 - 1.5 * iqr
+            upper_fence = q3 + 1.5 * iqr
+
+            in_fence_values = [a for a in ages if lower_fence <= a <= upper_fence]
+            outliers = [a for a in ages if a < lower_fence or a > upper_fence]
+
+            whisker_low = min(in_fence_values) if in_fence_values else min(ages)
+            whisker_high = max(in_fence_values) if in_fence_values else max(ages)
+
             return {
                 "ranges": ranges,
                 "avg": round(sum(ages) / len(ages), 1),
                 "min": min(ages),
                 "max": max(ages),
-                "total": len(ages)
+                "total": len(ages),
+                "median": round(q2, 1),
+                "q1": round(q1, 1),
+                "q3": round(q3, 1),
+                "iqr": round(iqr, 1),
+                "whisker_low": round(whisker_low, 1),
+                "whisker_high": round(whisker_high, 1),
+                "outliers": outliers
             }
         
         def calculate_gender_distribution(respondents):

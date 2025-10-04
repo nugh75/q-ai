@@ -297,6 +297,7 @@ function Dashboard({ data, onRefresh }) {
                   <option value="all">Tutti i formati</option>
                   <option value="scale_1_7">Scala Likert (1-7)</option>
                   <option value="yes_no">Sì/No</option>
+                  <option value="single_choice">Scelta singola</option>
                   <option value="multiple_choice">Scelta multipla</option>
                   <option value="numeric">Numerica</option>
                   <option value="text">Testo aperto</option>
@@ -306,9 +307,24 @@ function Dashboard({ data, onRefresh }) {
                 <label>Categoria:</label>
                 <select value={questionFilter.category} onChange={(e) => setQuestionFilter({...questionFilter, category: e.target.value})}>
                   <option value="all">Tutte</option>
-                  {Object.keys(questionsData.statistics.categories).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
+                  {Object.keys(questionsData.statistics.categories).map(cat => {
+                    const categoryLabels = {
+                      'administrative': 'Amministrativa',
+                      'demographic': 'Demografica',
+                      'competence': 'Competenze',
+                      'trust': 'Fiducia',
+                      'concern': 'Preoccupazioni',
+                      'training': 'Formazione',
+                      'usage': 'Utilizzo',
+                      'tools': 'Strumenti',
+                      'personalization': 'Personalizzazione',
+                      'impact': 'Impatto',
+                      'challenges': 'Sfide',
+                      'open_reflection': 'Riflessioni',
+                      'other': 'Altro'
+                    }
+                    return <option key={cat} value={cat}>{categoryLabels[cat] || cat}</option>
+                  })}
                 </select>
               </div>
             </section>
@@ -316,16 +332,33 @@ function Dashboard({ data, onRefresh }) {
             <section className="questions-categories">
               <h3>Domande per Categoria</h3>
               <div className="category-grid">
-                {Object.entries(questionsData.statistics.categories).map(([category, stats]) => (
-                  <div key={category} className="category-card">
-                    <h4>{category}</h4>
-                    <div className="category-stats">
-                      <span className="total">Totale: {stats.total}</span>
-                      <span className="open">Aperte: {stats.open}</span>
-                      <span className="closed">Chiuse: {stats.closed}</span>
+                {Object.entries(questionsData.statistics.categories).map(([category, stats]) => {
+                  const categoryLabels = {
+                    'administrative': 'Amministrativa',
+                    'demographic': 'Demografica',
+                    'competence': 'Competenze',
+                    'trust': 'Fiducia',
+                    'concern': 'Preoccupazioni',
+                    'training': 'Formazione',
+                    'usage': 'Utilizzo',
+                    'tools': 'Strumenti',
+                    'personalization': 'Personalizzazione',
+                    'impact': 'Impatto',
+                    'challenges': 'Sfide',
+                    'open_reflection': 'Riflessioni',
+                    'other': 'Altro'
+                  }
+                  return (
+                    <div key={category} className="category-card">
+                      <h4>{categoryLabels[category] || category}</h4>
+                      <div className="category-stats">
+                        <span className="total">Totale: {stats.total}</span>
+                        <span className="open">Aperte: {stats.open}</span>
+                        <span className="closed">Chiuse: {stats.closed}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </section>
 
@@ -403,9 +436,36 @@ function Dashboard({ data, onRefresh }) {
                         </span>
                         <span className="question-category">
                           <Icons.Category className="w-3 h-3 inline" />
-                          {' '}{q.category}
+                          {' '}{(() => {
+                            const categoryLabels = {
+                              'administrative': 'Amministrativa',
+                              'demographic': 'Demografica',
+                              'competence': 'Competenze',
+                              'trust': 'Fiducia',
+                              'concern': 'Preoccupazioni',
+                              'training': 'Formazione',
+                              'usage': 'Utilizzo',
+                              'tools': 'Strumenti',
+                              'personalization': 'Personalizzazione',
+                              'impact': 'Impatto',
+                              'challenges': 'Sfide',
+                              'open_reflection': 'Riflessioni',
+                              'other': 'Altro'
+                            }
+                            return categoryLabels[q.category] || q.category
+                          })()}
                         </span>
-                        <span className="question-format">{q.response_format}</span>
+                        <span className="question-format">{(() => {
+                          const formatLabels = {
+                            'scale_1_7': 'Scala 1-7',
+                            'yes_no': 'Sì/No',
+                            'single_choice': 'Scelta singola',
+                            'multiple_choice': 'Scelta multipla',
+                            'numeric': 'Numerica',
+                            'text': 'Testo aperto'
+                          }
+                          return formatLabels[q.response_format] || q.response_format
+                        })()}</span>
                       </div>
                       <div className="question-text">
                         <strong>#{q.column_index + 1}:</strong> {q.question_text}

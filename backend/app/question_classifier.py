@@ -39,9 +39,17 @@ class QuestionClassifier:
     YES_NO_KEYWORDS = ['utilizzi', 'attualmente insegni']
     NUMERIC_KEYWORDS = ['quanti anni', 'quante ore']
     # Nota: settore scientifico-disciplinare è multiple_choice perché gli insegnanti possono avere più classi di concorso
-    MULTIPLE_CHOICE_KEYWORDS = ['seleziona tutte', 'puoi selezionare più opzioni', 'quali sono gli strumenti', 'quale ordine', 'in quale ordine', 'che scuola', 'settore scientifico-disciplinare']
-    # Domande a scelta singola (non dividere per virgole)
-    SINGLE_CHOICE_KEYWORDS = ['insegna (o insegnerà) una materia', 'tipo di materia']
+    MULTIPLE_CHOICE_KEYWORDS = ['seleziona tutte', 'puoi selezionare più opzioni', 'quali sono gli strumenti', 'settore scientifico-disciplinare']
+    # Domande a scelta singola (non dividere per virgole) - dropdown con una sola opzione selezionabile
+    SINGLE_CHOICE_KEYWORDS = [
+        'il tuo genere è',
+        'titolo di studio',
+        'che scuola frequenti',
+        'percorso attuale di studio è di tipo',
+        'insegna (o insegnerà) una materia',
+        'in quale ordine di scuola',
+        'attualmente insegni o hai intenzione'
+    ]
     
     @staticmethod
     def classify_question(question_text: str) -> str:
@@ -133,6 +141,10 @@ class QuestionClassifier:
             Categoria della domanda
         """
         question_lower = question_text.lower()
+        
+        # Amministrative/Metadata (timestamp e codice anonimo)
+        if column_index <= 1:
+            return 'administrative'
         
         # Demografiche (prime colonne e domande specifiche)
         if column_index <= 8 and any(word in question_lower for word in ['età', 'genere', 'scuola', 'titolo', 'studio', 'percorso', 'ordine', 'materia', 'settore', 'anni hai', 'attualmente insegni', 'professione docente']):
