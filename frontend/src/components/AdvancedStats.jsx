@@ -98,7 +98,7 @@ const AdvancedStats = () => {
         textAlign: 'center'
       }}>
         <h1 style={{ color: '#1e40af', marginBottom: '10px' }}>
-          📊 Statistiche Avanzate - Publication Ready
+          Statistiche avanzate - publication ready
         </h1>
         <p style={{ color: '#64748b', fontSize: '1.1em' }}>
           Visualizzazioni scientifiche con intervalli di confidenza e analisi correlazioni
@@ -127,7 +127,7 @@ const AdvancedStats = () => {
             transition: 'all 0.2s'
           }}
         >
-          📊 Confronto con Error Bars
+          Confronto con error bars
         </button>
         <button
           onClick={() => setSelectedTab('correlation-student')}
@@ -143,7 +143,7 @@ const AdvancedStats = () => {
             transition: 'all 0.2s'
           }}
         >
-          🔗 Correlazioni Studenti
+          Correlazioni studenti
         </button>
         <button
           onClick={() => setSelectedTab('correlation-teacher')}
@@ -159,7 +159,7 @@ const AdvancedStats = () => {
             transition: 'all 0.2s'
           }}
         >
-          🔗 Correlazioni Insegnanti
+          Correlazioni insegnanti
         </button>
       </div>
 
@@ -174,7 +174,7 @@ const AdvancedStats = () => {
           <div>
             <ErrorBarChart
               data={comparisonData.comparisons}
-              title="Confronto Studenti vs Insegnanti con Intervalli di Confidenza 95%"
+              title="Confronto studenti vs insegnanti con intervalli di confidenza 95%"
             />
 
             <div style={{
@@ -185,7 +185,7 @@ const AdvancedStats = () => {
               borderLeft: '4px solid #0ea5e9'
             }}>
               <h3 style={{ color: '#0c4a6e', marginBottom: '15px' }}>
-                💡 Interpretazione Statistica
+                Interpretazione statistica
               </h3>
               <p style={{ color: '#475569', lineHeight: '1.6' }}>
                 Le <strong>barre di errore</strong> (linee verticali sopra le barre) rappresentano
@@ -205,7 +205,7 @@ const AdvancedStats = () => {
           <div>
             <CorrelationHeatmap
               correlationData={correlationDataStudent}
-              title="Matrice di Correlazione - Studenti (Pearson)"
+              title="Matrice di correlazione - studenti (Pearson)"
             />
 
             <div style={{
@@ -216,7 +216,7 @@ const AdvancedStats = () => {
               borderLeft: '4px solid #10b981'
             }}>
               <h3 style={{ color: '#065f46', marginBottom: '15px' }}>
-                📈 Insights Chiave - Studenti
+                Insights chiave - studenti
               </h3>
               {correlationDataStudent.significant_correlations.length > 0 && (
                 <ul style={{ color: '#475569', lineHeight: '1.8', paddingLeft: '20px' }}>
@@ -237,7 +237,7 @@ const AdvancedStats = () => {
           <div>
             <CorrelationHeatmap
               correlationData={correlationDataTeacher}
-              title="Matrice di Correlazione - Insegnanti (Pearson)"
+              title="Matrice di correlazione - insegnanti (Pearson)"
             />
 
             <div style={{
@@ -248,7 +248,7 @@ const AdvancedStats = () => {
               borderLeft: '4px solid #eab308'
             }}>
               <h3 style={{ color: '#713f12', marginBottom: '15px' }}>
-                📈 Insights Chiave - Insegnanti
+                Insights chiave - insegnanti
               </h3>
               <p style={{ color: '#475569', marginBottom: '15px' }}>
                 <strong>Variabili binarie incluse:</strong>

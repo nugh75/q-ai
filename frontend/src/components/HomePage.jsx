@@ -100,7 +100,7 @@ const HomePage = ({ showHeader = true }) => {
         <div style={styles.editBar}>
           <button style={styles.editButton} onClick={handleEdit}>
             <Icons.Edit className="w-4 h-4" />
-            Modifica Contenuto
+            Modifica contenuto
           </button>
         </div>
       )}
@@ -128,7 +128,7 @@ const HomePage = ({ showHeader = true }) => {
       {isEditing ? (
         <div style={styles.editor}>
           <div style={styles.editorHeader}>
-            <h3 style={styles.editorTitle}>Modifica Homepage</h3>
+            <h3 style={styles.editorTitle}>Modifica homepage</h3>
             <div style={styles.editorButtons}>
               <button 
                 style={styles.cancelButton} 

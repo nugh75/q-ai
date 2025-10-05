@@ -95,7 +95,7 @@ class Analytics:
         query = self.db.query(TeacherResponse)
 
         if only_non_teaching:
-            # Solo insegnanti in formazione (che NON insegnano attualmente)
+            # Solo insegnanti non in servizio (che NON insegnano attualmente)
             query = query.filter(TeacherResponse.currently_teaching != 'Attualmente insegno.')
         elif not include_non_teaching:
             # Solo insegnanti attivi
@@ -353,7 +353,7 @@ class Analytics:
         - ore formazione/autoapprendimento
         - ore preparazione lezioni
 
-        Insegnanti in formazione: stesse correlazioni degli attivi
+        Insegnanti non in servizio: stesse correlazioni degli attivi
         """
 
         result = {
@@ -424,7 +424,7 @@ class Analytics:
         }
 
     def _get_teacher_correlations(self, include_non_teaching: bool = False, only_non_teaching: bool = False) -> Dict[str, Any]:
-        """Calcola correlazioni per insegnanti (attivi o in formazione)"""
+        """Calcola correlazioni per insegnanti (attivi o non in servizio)"""
         query = self.db.query(TeacherResponse)
 
         if only_non_teaching:

@@ -15,6 +15,7 @@ import os
 import statistics
 import numpy as np
 import pandas as pd
+import re
 from pathlib import Path
 
 # Funzioni di codifica per variabili categoriche
@@ -251,7 +252,7 @@ def get_teacher_statistics(
 ):
     """Ottieni statistiche degli insegnanti
     - include_non_teaching=True: tutti gli insegnanti (455)
-    - only_non_teaching=True: solo insegnanti in formazione (99)
+    - only_non_teaching=True: solo insegnanti non in servizio (99)
     - default: solo insegnanti attivi (356)
     """
     try:
@@ -285,10 +286,10 @@ def get_active_teacher_statistics(db: Session = Depends(get_db)):
 
 @app.get("/api/teachers/training")
 def get_training_teacher_statistics(db: Session = Depends(get_db)):
-    """Ottieni statistiche solo degli insegnanti in formazione (99)"""
+    """Ottieni statistiche solo degli insegnanti non in servizio (99)"""
     try:
         analytics = Analytics(db)
-        # Crea statistiche solo per insegnanti in formazione
+        # Crea statistiche solo per insegnanti non in servizio
         query = db.query(TeacherResponse).filter(
             TeacherResponse.currently_teaching == 'Ancora non insegno, ma sto seguendo o ho concluso un percorso PEF (Percorso di formazione iniziale degli insegnanti).'
         )
@@ -344,7 +345,7 @@ def get_overview_statistics(db: Session = Depends(get_db)):
             TeacherResponse.currently_teaching == 'Attualmente insegno.'
         ).count()
         
-        # Conta insegnanti in formazione
+        # Conta insegnanti non in servizio
         training_teachers = db.query(TeacherResponse).filter(
             TeacherResponse.currently_teaching == 'Ancora non insegno, ma sto seguendo o ho concluso un percorso PEF (Percorso di formazione iniziale degli insegnanti).'
         ).count()
@@ -367,7 +368,7 @@ def get_comparative_analysis(
 ):
     """Ottieni analisi comparativa tra studenti e insegnanti
     - include_non_teaching=True: confronta con tutti gli insegnanti
-    - only_non_teaching=True: confronta con solo insegnanti in formazione
+    - only_non_teaching=True: confronta con solo insegnanti non in servizio
     - default: confronta con solo insegnanti attivi
     """
     try:
@@ -394,19 +395,161 @@ def get_tools_analysis(db: Session = Depends(get_db)):
         # Insegnanti
         teachers = db.query(TeacherResponse).filter(TeacherResponse.ai_tools.isnot(None)).all()
         teacher_tools = {}
+        teacher_tools_active = {}
+        teacher_tools_training = {}
+        active_status = 'Attualmente insegno.'
+
         for t in teachers:
-            if t.ai_tools:
-                tools = [tool.strip() for tool in t.ai_tools.split(',')]
-                for tool in tools:
-                    teacher_tools[tool] = teacher_tools.get(tool, 0) + 1
+            if not t.ai_tools:
+                continue
+
+            tools = [tool.strip() for tool in t.ai_tools.split(',') if tool and tool.strip()]
+            if not tools:
+                continue
+
+            is_active = (t.currently_teaching or '').strip() == active_status
+            target_dict = teacher_tools_active if is_active else teacher_tools_training
+
+            for tool in tools:
+                teacher_tools[tool] = teacher_tools.get(tool, 0) + 1
+                target_dict[tool] = target_dict.get(tool, 0) + 1
+
+        # Distribuzione complessiva studenti + docenti
+        all_tools = student_tools.copy()
+        for tool, count in teacher_tools.items():
+            all_tools[tool] = all_tools.get(tool, 0) + count
 
         return {
             'student_tools': dict(sorted(student_tools.items(), key=lambda x: x[1], reverse=True)),
-            'teacher_tools': dict(sorted(teacher_tools.items(), key=lambda x: x[1], reverse=True))
+            'teacher_tools': dict(sorted(teacher_tools.items(), key=lambda x: x[1], reverse=True)),
+            'teacher_tools_active': dict(sorted(teacher_tools_active.items(), key=lambda x: x[1], reverse=True)),
+            'teacher_tools_training': dict(sorted(teacher_tools_training.items(), key=lambda x: x[1], reverse=True)),
+            'all_tools': dict(sorted(all_tools.items(), key=lambda x: x[1], reverse=True))
         }
 
     except Exception as e:
         logger.error(f"Error getting tools analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/tools-usage-distribution")
+def get_tools_usage_distribution(db: Session = Depends(get_db)):
+    """Analizza la distribuzione del numero di strumenti utilizzati per categoria"""
+    try:
+        def parse_tools(ai_tools_str: Optional[str]) -> List[str]:
+            """Restituisce la lista di strumenti univoci puliti per risposta"""
+            if not ai_tools_str:
+                return []
+
+            raw_tokens = re.split(r'[\n,;]+', str(ai_tools_str))
+            unique_tools: List[str] = []
+            seen = set()
+
+            for token in raw_tokens:
+                cleaned = token.strip()
+                if not cleaned:
+                    continue
+
+                normalized = cleaned.casefold()
+                if normalized not in seen:
+                    seen.add(normalized)
+                    unique_tools.append(cleaned)
+
+            return unique_tools
+
+        def build_distribution(responses, respondent_label: str):
+            """Costruisce la distribuzione del numero di strumenti"""
+            distribution = {"1": 0, "2": 0, "3": 0, "4": 0, "5+": 0}
+            tool_counts = []
+            details: List[Dict[str, Any]] = []
+            zero_tools_count = 0
+            total_responses = 0
+
+            for resp in responses:
+                total_responses += 1
+                tools = parse_tools(getattr(resp, "ai_tools", None))
+                num_tools = len(tools)
+
+                if num_tools == 0:
+                    zero_tools_count += 1
+                    continue
+
+                tool_counts.append(num_tools)
+
+                if num_tools <= 4:
+                    distribution[str(num_tools)] += 1
+                else:
+                    distribution["5+"] += 1
+
+                details.append({
+                    "respondent_type": respondent_label,
+                    "id": getattr(resp, "id", None),
+                    "code": getattr(resp, "code", None),
+                    "currently_teaching": getattr(resp, "currently_teaching", None),
+                    "tool_count": num_tools,
+                    "tools": tools
+                })
+
+            # Calcola statistiche
+            if tool_counts:
+                from statistics import mean, mode, StatisticsError
+                avg = mean(tool_counts)
+                try:
+                    most_common = mode(tool_counts)
+                except StatisticsError:
+                    most_common = tool_counts[0] if tool_counts else 0
+            else:
+                avg = 0
+                most_common = 0
+
+            return {
+                "distribution": distribution,
+                "stats": {
+                    "mean": round(avg, 2),
+                    "mode": most_common,
+                    "total": len(tool_counts),
+                    "excluded_zero": zero_tools_count,
+                    "overall": total_responses
+                },
+                "details": details
+            }
+
+        # Studenti
+        students = db.query(StudentResponse).all()
+        students_data = build_distribution(students, "student")
+
+        # Docenti: categorizza in attivi e in formazione/non attivi
+        teachers = db.query(TeacherResponse).all()
+        active_status = 'Attualmente insegno.'
+
+        teachers_active = [t for t in teachers if (t.currently_teaching or '').strip() == active_status]
+        teachers_training = [t for t in teachers if t.currently_teaching and (t.currently_teaching or '').strip() != active_status]
+
+        teachers_active_data = build_distribution(teachers_active, "teacher_active")
+        teachers_training_data = build_distribution(teachers_training, "teacher_training")
+
+        return {
+            "students": students_data["distribution"],
+            "teachers_active": teachers_active_data["distribution"],
+            "teachers_training": teachers_training_data["distribution"],
+            "stats": {
+                "students": students_data["stats"],
+                "teachers_active": teachers_active_data["stats"],
+                "teachers_training": teachers_training_data["stats"]
+            },
+            "total_respondents": {
+                "students": len(students),
+                "teachers_active": len(teachers_active),
+                "teachers_training": len(teachers_training)
+            },
+            "details": {
+                "students": students_data["details"],
+                "teachers_active": teachers_active_data["details"],
+                "teachers_training": teachers_training_data["details"]
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting tools usage distribution: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/questions")
@@ -1095,7 +1238,7 @@ def comparison_with_confidence_intervals(
 
     Parameters:
     - include_non_teaching: True per tutti gli insegnanti (455)
-    - only_non_teaching: True per solo insegnanti in formazione (99)
+    - only_non_teaching: True per solo insegnanti non in servizio (99)
     - default: solo insegnanti attivi (356)
 
     Returns:
@@ -1449,7 +1592,7 @@ def get_demographics_profiles(db: Session = Depends(get_db)):
     Ottieni profili demografici aggregati per le 3 categorie:
     - Studenti
     - Insegnanti attivi
-    - Insegnanti in formazione
+    - Insegnanti non in servizio
     
     Returns statistiche demografiche complete per confronto e drill-down
     """
@@ -1487,14 +1630,18 @@ def get_demographics_profiles(db: Session = Depends(get_db)):
                     "outliers": []
                 }
 
-            # Fasce età
+            # Fasce età (inclusa fascia under 18)
             ranges = {
+                "< 18": len([a for a in ages if a < 18]),
                 "18-25": len([a for a in ages if 18 <= a <= 25]),
                 "26-35": len([a for a in ages if 26 <= a <= 35]),
                 "36-45": len([a for a in ages if 36 <= a <= 45]),
                 "46-55": len([a for a in ages if 46 <= a <= 55]),
                 "56+": len([a for a in ages if a >= 56])
             }
+
+            # Rimuovi fasce vuote per una visualizzazione più pulita
+            ranges = {k: v for k, v in ranges.items() if v > 0}
 
             # Quartili e outlier (metodo IQR)
             if len(ages) >= 4:
@@ -1656,7 +1803,7 @@ async def get_usage_analysis(db: Session = Depends(get_db)):
         students = db.query(StudentResponse).all()
         teachers = db.query(TeacherResponse).all()
         
-        # Filtra insegnanti attivi e in formazione
+        # Filtra insegnanti attivi e non in servizio
         teachers_active = [t for t in teachers if t.currently_teaching == 'Attualmente insegno.']
         teachers_training = [t for t in teachers if t.currently_teaching == 'Ancora non insegno, ma sto seguendo o ho concluso un percorso PEF (Percorso di formazione iniziale degli insegnanti).']
         
@@ -1757,7 +1904,7 @@ async def get_usage_analysis(db: Session = Depends(get_db)):
         teachers_active_planning = [safe_float(t.hours_lesson_planning) for t in teachers_active if uses_ai_teacher(t)]
         teachers_active_training = [safe_float(t.hours_training) for t in teachers_active if uses_ai_teacher(t)]
         
-        # Ore insegnanti in formazione
+        # Ore insegnanti non in servizio
         teachers_training_daily = [safe_float(t.hours_daily) for t in teachers_training if uses_ai_teacher(t)]
         teachers_training_training = [safe_float(t.hours_training) for t in teachers_training if uses_ai_teacher(t)]
         
@@ -1879,6 +2026,76 @@ async def get_usage_analysis(db: Session = Depends(get_db)):
                 'humanistic': calculate_stats(humanistic_hours)
             }
 
+        def analyze_by_education(responses, get_hours_func, uses_ai_func):
+            """Analizza ore per titolo di studio"""
+            if get_hours_func is None:
+                return {}
+
+            education_stats = {}
+            for resp in responses:
+                if uses_ai_func(resp) and resp.education_level:
+                    education = resp.education_level
+                    hours = get_hours_func(resp)
+                    if hours is not None:
+                        education_stats.setdefault(education, []).append(hours)
+
+            return {
+                education: calculate_stats(hours_list)
+                for education, hours_list in education_stats.items()
+            }
+
+        def normalize_school_name(school_name):
+            """Normalizza i nomi delle scuole per raggruppare varianti simili"""
+            if not school_name:
+                return None
+
+            # Converti in lowercase e rimuovi spazi extra
+            normalized = school_name.lower().strip()
+
+            # Normalizzazioni specifiche per scuola infanzia
+            if 'infanzia' in normalized:
+                return 'Scuola dell\'infanzia'
+
+            # Normalizzazioni per primaria
+            if 'primaria' in normalized or 'elementare' in normalized:
+                return 'Scuola primaria'
+
+            # Normalizzazioni per secondaria di primo grado
+            if ('secondaria' in normalized and 'primo' in normalized) or 'media' in normalized:
+                return 'Scuola secondaria di I grado'
+
+            # Normalizzazioni per secondaria di secondo grado
+            if ('secondaria' in normalized and 'secondo' in normalized) or 'superiore' in normalized or 'liceo' in normalized or 'istituto tecnico' in normalized or 'istituto professionale' in normalized:
+                return 'Scuola secondaria di II grado'
+
+            # Università
+            if 'universit' in normalized:
+                return 'Università'
+
+            # Se non corrisponde a nessuna categoria, mantieni il nome originale capitalizzato
+            return school_name.strip()
+
+        def analyze_by_school(responses, get_hours_func, uses_ai_func, school_field):
+            """Analizza ore per tipo di scuola/istituto"""
+            if get_hours_func is None:
+                return {}
+
+            school_stats = {}
+            for resp in responses:
+                if uses_ai_func(resp):
+                    school = getattr(resp, school_field, None)
+                    hours = get_hours_func(resp)
+                    if hours is not None and school:
+                        # Normalizza il nome della scuola
+                        normalized_school = normalize_school_name(school)
+                        if normalized_school:
+                            school_stats.setdefault(normalized_school, []).append(hours)
+
+            return {
+                school: calculate_stats(hours_list)
+                for school, hours_list in school_stats.items()
+            }
+
         metric_labels = {
             'uso_quotidiano': "Uso quotidiano dell'IA",
             'studio_didattica': "Ore per studio/didattica",
@@ -1921,6 +2138,10 @@ async def get_usage_analysis(db: Session = Depends(get_db)):
 
         stem_metric_config = age_metric_config
 
+        education_metric_config = age_metric_config
+
+        school_metric_config = age_metric_config
+
         def build_age_metrics():
             metrics = {}
             for metric_key, funcs in age_metric_config.items():
@@ -1948,6 +2169,26 @@ async def get_usage_analysis(db: Session = Depends(get_db)):
                     'students': analyze_by_stem(students, funcs.get('students'), uses_ai_student, 'study_path'),
                     'teachers_active': analyze_by_stem(teachers_active, funcs.get('teachers_active'), uses_ai_teacher, 'subject_type'),
                     'teachers_training': analyze_by_stem(teachers_training, funcs.get('teachers_training'), uses_ai_teacher, 'subject_type')
+                }
+            return metrics
+
+        def build_education_metrics():
+            metrics = {}
+            for metric_key, funcs in education_metric_config.items():
+                metrics[metric_key] = {
+                    'students': analyze_by_education(students, funcs.get('students'), uses_ai_student),
+                    'teachers_active': analyze_by_education(teachers_active, funcs.get('teachers_active'), uses_ai_teacher),
+                    'teachers_training': analyze_by_education(teachers_training, funcs.get('teachers_training'), uses_ai_teacher)
+                }
+            return metrics
+
+        def build_school_metrics():
+            metrics = {}
+            for metric_key, funcs in school_metric_config.items():
+                metrics[metric_key] = {
+                    'students': analyze_by_school(students, funcs.get('students'), uses_ai_student, 'school_type'),
+                    'teachers_active': analyze_by_school(teachers_active, funcs.get('teachers_active'), uses_ai_teacher, 'school_level'),
+                    'teachers_training': analyze_by_school(teachers_training, funcs.get('teachers_training'), uses_ai_teacher, 'school_level')
                 }
             return metrics
 
@@ -2043,7 +2284,9 @@ async def get_usage_analysis(db: Session = Depends(get_db)):
             'metric_labels': metric_labels,
             'age': build_age_metrics(),
             'gender': build_gender_metrics(),
-            'stem_vs_humanistic': build_stem_metrics()
+            'stem_vs_humanistic': build_stem_metrics(),
+            'education': build_education_metrics(),
+            'school': build_school_metrics()
         }
 
         influence_factors = {
@@ -2159,7 +2402,7 @@ async def get_correlation_analysis(db: Session = Depends(get_db)):
     - ore formazione/autoapprendimento
     - ore preparazione lezioni
 
-    Insegnanti in formazione: stesse correlazioni degli attivi
+    Insegnanti non in servizio: stesse correlazioni degli attivi
     """
     try:
         analytics = Analytics(db)
@@ -2184,7 +2427,7 @@ def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
     Gruppi:
     - students: Studenti
     - teachers_active: Insegnanti che insegnano attualmente
-    - teachers_training: Insegnanti in formazione (non insegnano attualmente)
+    - teachers_training: Insegnanti non in servizio (non insegnano attualmente)
     """
     try:
         # Definizione domande Likert per studenti
@@ -2305,7 +2548,7 @@ def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
                     }
                 })
 
-        # Insegnanti in formazione
+        # Insegnanti non in servizio
         teachers_training = db.query(TeacherResponse).filter(
             TeacherResponse.currently_teaching != 'Attualmente insegno.'
         ).all()

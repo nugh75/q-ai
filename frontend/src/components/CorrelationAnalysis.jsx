@@ -178,7 +178,7 @@ function CorrelationAnalysis() {
           gap: '10px'
         }}>
           <Icons.TrendingUp size={32} />
-          Analisi Correlazioni
+          Analisi correlazioni
         </h1>
         <p style={{ fontSize: '16px', color: '#64748b' }}>
           Correlazioni tra fattori di influenzamento (scala Likert 1-7) e variabili di utilizzo dell'IA
@@ -213,7 +213,7 @@ function CorrelationAnalysis() {
             fontWeight: activeGroup === 'teachers_active' ? 'bold' : 'normal'
           }}
         >
-          Insegnanti Attivi ({data.teachers_active?.total_teachers || 0})
+          Insegnanti in servizio ({data.teachers_active?.total_teachers || 0})
         </button>
         <button
           onClick={() => setActiveGroup('teachers_in_training')}
@@ -227,7 +227,7 @@ function CorrelationAnalysis() {
             fontWeight: activeGroup === 'teachers_in_training' ? 'bold' : 'normal'
           }}
         >
-          Insegnanti in Formazione ({data.teachers_in_training?.total_teachers || 0})
+          Insegnanti in formazione ({data.teachers_in_training?.total_teachers || 0})
         </button>
       </div>
 
@@ -248,7 +248,7 @@ function CorrelationAnalysis() {
               transition: 'all 0.2s'
             }}
           >
-            Correlazioni Più Significative
+            Correlazioni più significative
           </button>
           <button
             onClick={() => setActiveTab('dettagli')}
@@ -280,7 +280,7 @@ function CorrelationAnalysis() {
         }}>
           <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '10px', color: '#6d28d9', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Icons.TrendingUp className="w-6 h-6" />
-            Correlazioni Più Significative
+            Correlazioni più significative
           </h2>
           <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '20px' }}>
             Tutte le correlazioni ordinate per intensità (valore assoluto del coefficiente)
@@ -321,7 +321,7 @@ function CorrelationAnalysis() {
                     <tr style={{ background: '#f5f3ff', borderBottom: '2px solid #8b5cf6' }}>
                       <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#6d28d9' }}>Posizione</th>
                       <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#6d28d9' }}>Fattore Likert</th>
-                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#6d28d9' }}>Variabile Utilizzo</th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#6d28d9' }}>Variabile utilizzo</th>
                       <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: '#6d28d9' }}>Coefficiente</th>
                       <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: '#6d28d9' }}>Direzione</th>
                       <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: '#6d28d9' }}>Intensità</th>

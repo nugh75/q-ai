@@ -19,13 +19,53 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
 const COLORS = {
   students: '#3b82f6',
   teachers_active: '#10b981',
-  teachers_training: '#f59e0b'
+  teachers_training: '#f59e0b',
+  teachers_total: '#8b5cf6'  // Viola per Insegnanti Totali
 }
 
-const GENDER_COLORS = {
-  'Femmina': '#ec4899',
-  'Maschio': '#3b82f6',
-  'Altro o preferisco non specificare': '#6b7280'
+// Funzione per ottenere i colori di genere basati sulla categoria
+const getGenderColors = (category) => {
+  const baseColors = {
+    students: '#3b82f6',        // Blu
+    teachers_active: '#10b981',  // Verde
+    teachers_training: '#f59e0b', // Arancione
+    teachers_total: '#8b5cf6'    // Viola
+  }
+
+  const baseColor = baseColors[category] || '#64748b'
+
+  // Per ogni categoria, crea tonalità diverse per i generi
+  if (category === 'students') {
+    return {
+      'Femmina': '#3b82f6',      // Blu base
+      'Maschio': '#93c5fd',      // Blu chiaro
+      'Altro o preferisco non specificare': '#cbd5e1' // Grigio
+    }
+  } else if (category === 'teachers_active') {
+    return {
+      'Femmina': '#10b981',      // Verde base
+      'Maschio': '#6ee7b7',      // Verde chiaro
+      'Altro o preferisco non specificare': '#cbd5e1' // Grigio
+    }
+  } else if (category === 'teachers_training') {
+    return {
+      'Femmina': '#f59e0b',      // Arancione base
+      'Maschio': '#fcd34d',      // Arancione chiaro
+      'Altro o preferisco non specificare': '#cbd5e1' // Grigio
+    }
+  } else if (category === 'teachers_total') {
+    return {
+      'Femmina': '#8b5cf6',      // Viola base
+      'Maschio': '#c4b5fd',      // Viola chiaro
+      'Altro o preferisco non specificare': '#cbd5e1' // Grigio
+    }
+  }
+
+  return {
+    'Femmina': '#64748b',
+    'Maschio': '#94a3b8',
+    'Altro o preferisco non specificare': '#cbd5e1'
+  }
 }
 
 // Funzioni di utilità per il download
@@ -94,7 +134,7 @@ const downloadCSV = (data, headers, filename) => {
 
 /**
  * Componente per visualizzare profili demografici dei rispondenti
- * Confronta studenti, insegnanti attivi e insegnanti in formazione
+ * Confronta studenti, insegnanti in servizio e insegnanti non in servizio
  */
 function RespondentProfiles() {
   const [data, setData] = useState(null)
@@ -168,13 +208,14 @@ function RespondentProfiles() {
   const totalData = [
     { name: 'Studenti', value: data.totals.students, color: COLORS.students },
     { name: 'Insegnanti', value: data.totals.teachers_active, color: COLORS.teachers_active },
-    { name: 'In Formazione', value: data.totals.teachers_training, color: COLORS.teachers_training }
+    { name: 'Non in Servizio', value: data.totals.teachers_training, color: COLORS.teachers_training }
   ]
 
   // Dati età comparativa con quartili e outliers
   const ageData = [
     {
       category: 'Studenti',
+      color: COLORS.students,
       avg: data.students.age?.avg ?? 0,
       min: data.students.age?.min ?? 0,
       max: data.students.age?.max ?? 0,
@@ -188,6 +229,7 @@ function RespondentProfiles() {
     },
     {
       category: 'Insegnanti',
+      color: COLORS.teachers_active,
       avg: data.teachers_active.age?.avg ?? 0,
       min: data.teachers_active.age?.min ?? 0,
       max: data.teachers_active.age?.max ?? 0,
@@ -200,7 +242,8 @@ function RespondentProfiles() {
       total: data.teachers_active.age?.total ?? 0
     },
     {
-      category: 'In Formazione',
+      category: 'Non in Servizio',
+      color: COLORS.teachers_training,
       avg: data.teachers_training.age?.avg ?? 0,
       min: data.teachers_training.age?.min ?? 0,
       max: data.teachers_training.age?.max ?? 0,
@@ -216,19 +259,19 @@ function RespondentProfiles() {
 
   // Dati genere per studenti
   const studentsGenderData = Object.entries(data.students.gender.distribution || {}).map(([name, value]) => ({
-    name: name.substring(0, 20),
+    name: name,
     value,
     percentage: data.students.gender.percentages[name]
   }))
 
   const teachersActiveGenderData = Object.entries(data.teachers_active.gender.distribution || {}).map(([name, value]) => ({
-    name: name.substring(0, 20),
+    name: name,
     value,
     percentage: data.teachers_active.gender.percentages[name]
   }))
 
   const teachersTrainingGenderData = Object.entries(data.teachers_training.gender.distribution || {}).map(([name, value]) => ({
-    name: name.substring(0, 20),
+    name: name,
     value,
     percentage: data.teachers_training.gender.percentages[name]
   }))
@@ -239,10 +282,10 @@ function RespondentProfiles() {
       <div style={{ marginBottom: '30px' }}>
         <h2 style={{ color: '#1e40af', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icons.Student className="w-6 h-6" />
-          Profili Demografici Rispondenti
+          Profili demografici rispondenti
         </h2>
         <p style={{ color: '#64748b', fontSize: '0.95em' }}>
-          Confronto delle caratteristiche demografiche tra studenti, insegnanti attivi e insegnanti in formazione
+          Confronto delle caratteristiche demografiche tra studenti, insegnanti in servizio e insegnanti non in servizio
         </p>
       </div>
 
@@ -256,7 +299,7 @@ function RespondentProfiles() {
       }}>
         <h3 style={{ marginBottom: '20px', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Icons.Overview className="w-5 h-5" />
-          Distribuzione Totale Rispondenti
+          Distribuzione totale rispondenti
         </h3>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '30px' }}>
@@ -290,7 +333,7 @@ function RespondentProfiles() {
               {data.totals.all}
             </div>
             <div style={{ fontSize: '0.9rem', color: '#64748b', marginTop: '5px' }}>
-              Totale Rispondenti
+              Totale rispondenti
             </div>
           </div>
         </div>
@@ -311,7 +354,7 @@ function RespondentProfiles() {
 
         {/* Tabella Totali */}
         <div style={{ marginTop: '25px', overflowX: 'auto' }}>
-          <h4 style={{ marginBottom: '15px', color: '#334155' }}>Tabella Dati Totali</h4>
+          <h4 style={{ marginBottom: '15px', color: '#334155' }}>Tabella dati totali</h4>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
             <thead>
               <tr style={{ backgroundColor: '#f1f5f9' }}>
@@ -377,7 +420,7 @@ function RespondentProfiles() {
         marginBottom: '25px'
       }}>
         <h3 style={{ marginBottom: '20px', color: '#334155' }}>
-          Confronto Età Media con Outliers (Box Plot)
+          Confronto età media con outliers (box plot)
         </h3>
         <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '6px', display: 'flex', gap: '10px' }}>
           <Icons.Info className="w-5 h-5" style={{ color: '#3b82f6', flexShrink: 0, marginTop: '2px' }} />
@@ -654,7 +697,7 @@ function RespondentProfiles() {
         <div style={{ marginTop: '25px', overflowX: 'auto' }}>
           <h4 style={{ marginBottom: '15px', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Icons.List className="w-5 h-5" />
-            Tabella Dati Statistici Età
+            Tabella dati statistici età
           </h4>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
             <thead>
@@ -696,7 +739,7 @@ function RespondentProfiles() {
         <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa' }}>
           <h4 style={{ margin: '0 0 15px 0', color: '#9a3412', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Icons.AlertCircle className="w-5 h-5" />
-            Analisi Outliers (Valori Anomali)
+            Analisi outliers (valori anomali)
           </h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
             {ageData.map((group, idx) => {
@@ -709,18 +752,22 @@ function RespondentProfiles() {
               const upperOutliers = (group.outliers || []).filter(value => value > upperBound)
               const hasOutliers = lowerOutliers.length > 0 || upperOutliers.length > 0
 
+              // Crea una versione chiara del colore della categoria per lo sfondo
+              const lightColor = group.color + '15' // Aggiunge opacità 15% (~9% in decimale)
+              const borderColor = group.color + '50' // Aggiunge opacità 50% (~31% in decimale)
+
               return (
                 <div key={idx} style={{
                   padding: '15px',
-                  backgroundColor: hasOutliers ? '#fef2f2' : '#f0fdf4',
+                  backgroundColor: lightColor,
                   borderRadius: '6px',
-                  border: `2px solid ${hasOutliers ? '#fca5a5' : '#86efac'}`
+                  border: `2px solid ${borderColor}`
                 }}>
-                  <div style={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ fontWeight: 'bold', color: group.color, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {hasOutliers ? (
-                      <Icons.Warning className="w-4 h-4" style={{ color: '#dc2626' }} />
+                      <Icons.Warning className="w-4 h-4" style={{ color: group.color }} />
                     ) : (
-                      <Icons.Check className="w-4 h-4" style={{ color: '#16a34a' }} />
+                      <Icons.Check className="w-4 h-4" style={{ color: group.color }} />
                     )}
                     {group.category}
                   </div>
@@ -731,9 +778,9 @@ function RespondentProfiles() {
                     <p style={{ margin: '5px 0' }}>Range complessivo: {group.min} - {group.max} anni</p>
                     <p style={{ margin: '5px 0' }}>Ampiezza: <strong>{range}</strong> anni (IQR: {iqr})</p>
                     {hasOutliers ? (
-                      <div style={{ marginTop: '10px', padding: '8px', backgroundColor: '#fee2e2', borderRadius: '4px', fontSize: '0.8em' }}>
-                        <Icons.AlertCircle className="w-4 h-4" style={{ display: 'inline', marginRight: '4px', color: '#dc2626' }} />
-                        <strong>Outliers rilevati:</strong>
+                      <div style={{ marginTop: '10px', padding: '8px', backgroundColor: group.color + '20', borderRadius: '4px', fontSize: '0.8em', border: `1px solid ${group.color}` }}>
+                        <Icons.AlertCircle className="w-4 h-4" style={{ display: 'inline', marginRight: '4px', color: group.color }} />
+                        <strong style={{ color: group.color }}>Outliers rilevati:</strong>
                         {lowerOutliers.length > 0 && (
                           <p style={{ margin: '4px 0 0 20px' }}>Bassi: {lowerOutliers.join(', ')}</p>
                         )}
@@ -742,7 +789,7 @@ function RespondentProfiles() {
                         )}
                       </div>
                     ) : (
-                      <div style={{ marginTop: '10px', padding: '8px', backgroundColor: '#dcfce7', borderRadius: '4px', fontSize: '0.8em', color: '#166534' }}>
+                      <div style={{ marginTop: '10px', padding: '8px', backgroundColor: group.color + '20', borderRadius: '4px', fontSize: '0.8em', color: group.color, border: `1px solid ${group.color}` }}>
                         <Icons.Check className="w-4 h-4" style={{ display: 'inline', marginRight: '4px' }} />
                         Nessun outlier significativo
                       </div>
@@ -769,8 +816,81 @@ function RespondentProfiles() {
         marginBottom: '25px'
       }}>
         <h3 style={{ marginBottom: '20px', color: '#334155' }}>
-          Distribuzione Genere per Categoria
+          Distribuzione genere per categoria
         </h3>
+
+        {/* Leggenda per generi */}
+        <div style={{
+          marginBottom: '25px',
+          padding: '15px',
+          backgroundColor: '#f8fafc',
+          borderRadius: '8px'
+        }}>
+          <div style={{ fontSize: '0.9em', fontWeight: '600', color: '#334155', marginBottom: '12px', textAlign: 'center' }}>
+            Legenda genere
+          </div>
+
+          {/* Leggenda per ogni categoria */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {/* Studenti */}
+            <div>
+              <div style={{ fontSize: '0.85em', fontWeight: '600', color: COLORS.students, marginBottom: '8px' }}>Studenti</div>
+              <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                {Object.entries(getGenderColors('students')).map(([gender, color]) => (
+                  <div key={gender} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      backgroundColor: color,
+                      borderRadius: '3px',
+                      border: '1px solid #cbd5e1'
+                    }} />
+                    <span style={{ fontSize: '0.8em', color: '#64748b' }}>{gender}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Insegnanti in Servizio */}
+            <div>
+              <div style={{ fontSize: '0.85em', fontWeight: '600', color: COLORS.teachers_active, marginBottom: '8px' }}>Insegnanti in servizio</div>
+              <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                {Object.entries(getGenderColors('teachers_active')).map(([gender, color]) => (
+                  <div key={gender} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      backgroundColor: color,
+                      borderRadius: '3px',
+                      border: '1px solid #cbd5e1'
+                    }} />
+                    <span style={{ fontSize: '0.8em', color: '#64748b' }}>{gender}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Insegnanti in Formazione */}
+            <div>
+              <div style={{ fontSize: '0.85em', fontWeight: '600', color: COLORS.teachers_training, marginBottom: '8px' }}>Insegnanti non in servizio</div>
+              <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                {Object.entries(getGenderColors('teachers_training')).map(([gender, color]) => (
+                  <div key={gender} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      backgroundColor: color,
+                      borderRadius: '3px',
+                      border: '1px solid #cbd5e1'
+                    }} />
+                    <span style={{ fontSize: '0.8em', color: '#64748b' }}>{gender}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
           {/* Studenti */}
           <div>
@@ -782,23 +902,24 @@ function RespondentProfiles() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({name, percentage}) => `${name}: ${percentage}%`}
+                  label={({value, percentage}) => `${percentage}% (${value})`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {studentsGenderData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={GENDER_COLORS[entry.name] || '#94a3b8'} />
-                  ))}
+                  {studentsGenderData.map((entry, index) => {
+                    const genderColors = getGenderColors('students')
+                    return <Cell key={`cell-${index}`} fill={genderColors[entry.name] || '#cbd5e1'} />
+                  })}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value, name, props) => [`${value} (${props.payload.percentage}%)`, props.payload.name]} />
               </PieChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Insegnanti Attivi */}
+          {/* Insegnanti in Servizio */}
           <div>
-            <h4 style={{ textAlign: 'center', color: COLORS.teachers_active, marginBottom: '10px' }}>Insegnanti</h4>
+            <h4 style={{ textAlign: 'center', color: COLORS.teachers_active, marginBottom: '10px' }}>Insegnanti in servizio</h4>
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
@@ -806,23 +927,24 @@ function RespondentProfiles() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({name, percentage}) => `${name}: ${percentage}%`}
+                  label={({value, percentage}) => `${percentage}% (${value})`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {teachersActiveGenderData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={GENDER_COLORS[entry.name] || '#94a3b8'} />
-                  ))}
+                  {teachersActiveGenderData.map((entry, index) => {
+                    const genderColors = getGenderColors('teachers_active')
+                    return <Cell key={`cell-${index}`} fill={genderColors[entry.name] || '#cbd5e1'} />
+                  })}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value, name, props) => [`${value} (${props.payload.percentage}%)`, props.payload.name]} />
               </PieChart>
             </ResponsiveContainer>
           </div>
 
           {/* Insegnanti in Formazione */}
           <div>
-            <h4 style={{ textAlign: 'center', color: COLORS.teachers_training, marginBottom: '10px' }}>In Formazione</h4>
+            <h4 style={{ textAlign: 'center', color: COLORS.teachers_training, marginBottom: '10px' }}>Insegnanti non in servizio</h4>
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
@@ -830,16 +952,17 @@ function RespondentProfiles() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({name, percentage}) => `${name}: ${percentage}%`}
+                  label={({value, percentage}) => `${percentage}% (${value})`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {teachersTrainingGenderData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={GENDER_COLORS[entry.name] || '#94a3b8'} />
-                  ))}
+                  {teachersTrainingGenderData.map((entry, index) => {
+                    const genderColors = getGenderColors('teachers_training')
+                    return <Cell key={`cell-${index}`} fill={genderColors[entry.name] || '#cbd5e1'} />
+                  })}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(value, name, props) => [`${value} (${props.payload.percentage}%)`, props.payload.name]} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -848,9 +971,9 @@ function RespondentProfiles() {
 
       {/* Sezioni Espandibili */}
       {renderExpandableSection('students', 'Studenti', COLORS.students, data.students, Icons.Student)}
-      {renderExpandableSection('teachers_active', 'Insegnanti Attivi', COLORS.teachers_active, data.teachers_active, Icons.Teacher)}
-      {renderExpandableSection('teachers_training', 'Insegnanti in Formazione', COLORS.teachers_training, data.teachers_training, Icons.Teacher)}
-      {renderExpandableSection('teachers_total', 'Insegnanti Totali', '#8b5cf6', mergeTeachersData(data.teachers_active, data.teachers_training), Icons.Teacher)}
+      {renderExpandableSection('teachers_active', 'Insegnanti in servizio', COLORS.teachers_active, data.teachers_active, Icons.Teacher)}
+      {renderExpandableSection('teachers_training', 'Insegnanti non in servizio', COLORS.teachers_training, data.teachers_training, Icons.Teacher)}
+      {renderExpandableSection('teachers_total', 'Insegnanti totali', '#8b5cf6', mergeTeachersData(data.teachers_active, data.teachers_training), Icons.Teacher)}
     </div>
   )
 
@@ -1027,7 +1150,7 @@ function RespondentProfiles() {
       <div>
         {/* Statistiche Età Dettagliate */}
         <div style={{ marginBottom: '30px' }}>
-          <h4 style={{ color: '#475569', marginBottom: '15px' }}>Distribuzione Età</h4>
+          <h4 style={{ color: '#475569', marginBottom: '15px' }}>Distribuzione età</h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '20px' }}>
             <div style={{ padding: '15px', backgroundColor: '#f8fafc', borderRadius: '6px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Media</div>
@@ -1066,7 +1189,7 @@ function RespondentProfiles() {
 
           {/* Tabella Fasce Età */}
           <div style={{ marginTop: '20px', overflowX: 'auto' }}>
-            <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella Dati Fasce Età</h5>
+            <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella dati fasce età</h5>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f1f5f9' }}>
@@ -1119,7 +1242,7 @@ function RespondentProfiles() {
 
         {/* Titoli di Studio */}
         <div style={{ marginBottom: '30px' }}>
-          <h4 style={{ color: '#475569', marginBottom: '15px' }}>Titoli di Studio</h4>
+          <h4 style={{ color: '#475569', marginBottom: '15px' }}>Titoli di studio</h4>
           <ResponsiveContainer width="100%" height={Math.max(400, educationData.length * 70)}>
             <BarChart data={educationData} layout="vertical" margin={{ top: 5, right: 50, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -1173,7 +1296,7 @@ function RespondentProfiles() {
 
           {/* Tabella Titoli di Studio */}
           <div style={{ marginTop: '20px', overflowX: 'auto' }}>
-            <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella Dati Titoli di Studio</h5>
+            <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella dati titoli di studio</h5>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f1f5f9' }}>
@@ -1222,9 +1345,165 @@ function RespondentProfiles() {
         </div>
 
         {/* Campi specifici per categoria */}
+        {/* Tipo di Percorso: STEM vs Umanistica (solo per studenti) */}
+        {category === 'students' && profileData.study_path && (
+          <div style={{ marginBottom: '30px' }}>
+            <h4 style={{ color: '#475569', marginBottom: '15px' }}>Tipo di percorso di studio: STEM vs umanistico</h4>
+            {(() => {
+              const studyPathData = Object.entries(profileData.study_path.distribution || {})
+                .map(([name, value]) => ({
+                  name: name.includes('STEM') ? 'STEM' : 'Umanistico',
+                  fullName: name,
+                  value,
+                  percentage: ((value / profileData.study_path.total) * 100).toFixed(1)
+                }))
+
+              const STUDY_PATH_COLORS = {
+                'STEM': '#3b82f6',
+                'Umanistico': '#f59e0b'
+              }
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  {/* Grafico a torta */}
+                  <div>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={studyPathData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={true}
+                          label={({ name, percentage }) => `${name}: ${percentage}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {studyPathData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={STUDY_PATH_COLORS[entry.name]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload
+                            return (
+                              <div style={{ backgroundColor: 'white', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }}>
+                                <p style={{ margin: 0, fontWeight: 'bold' }}>{data.fullName}</p>
+                                <p style={{ margin: '5px 0 0 0' }}>Studenti: {data.value} ({data.percentage}%)</p>
+                              </div>
+                            )
+                          }
+                          return null
+                        }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Statistiche dettagliate */}
+                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '15px' }}>
+                    {studyPathData.map((item, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '20px',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '8px',
+                          borderLeft: `4px solid ${STUDY_PATH_COLORS[item.name]}`
+                        }}
+                      >
+                        <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: STUDY_PATH_COLORS[item.name], marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {item.name === 'STEM' ? (
+                            <><Icons.Science className="w-5 h-5" /> STEM</>
+                          ) : (
+                            <><Icons.Book className="w-5 h-5" /> Umanistico</>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1e293b' }}>
+                          {item.value}
+                        </div>
+                        <div style={{ fontSize: '0.9rem', color: '#64748b', marginTop: '5px' }}>
+                          {item.percentage}% del totale
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '8px', fontStyle: 'italic' }}>
+                          {item.fullName}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Tabella STEM vs Umanistico */}
+            {(() => {
+              const studyPathData = Object.entries(profileData.study_path.distribution || {})
+                .map(([name, value]) => ({
+                  name: name,
+                  value,
+                  percentage: ((value / profileData.study_path.total) * 100).toFixed(1)
+                }))
+
+              return (
+                <>
+                  <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                    <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella dati STEM vs umanistico</h5>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f1f5f9' }}>
+                          <th style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Tipo Percorso</th>
+                          <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Numero</th>
+                          <th style={{ padding: '10px', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '600' }}>Percentuale</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {studyPathData.map((item, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? 'white' : '#f8fafc' }}>
+                            <td style={{ padding: '10px', fontWeight: '500', color: '#1e293b' }}>{item.name}</td>
+                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b', fontWeight: '600' }}>{item.value}</td>
+                            <td style={{ padding: '10px', textAlign: 'center', color: '#64748b' }}>{item.percentage}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pulsante Download CSV Percorso di Studio */}
+                  <div style={{ marginTop: '10px' }}>
+                    <button
+                      onClick={() => {
+                        const csvData = studyPathData.map(item => ({
+                          'Tipo Percorso': item.name,
+                          'Numero': item.value,
+                          'Percentuale': item.percentage + '%'
+                        }))
+                        downloadCSV(csvData, ['Tipo Percorso', 'Numero', 'Percentuale'], 'stem-umanistico-studenti.csv')
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: COLORS.students,
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.85em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Icons.Save className="w-4 h-4" />
+                      Scarica CSV
+                    </button>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        )}
+
         {category === 'students' && profileData.school_type && (
           <div style={{ marginBottom: '30px' }}>
-            <h4 style={{ color: '#475569', marginBottom: '15px' }}>Scuola o Istituto che Frequento</h4>
+            <h4 style={{ color: '#475569', marginBottom: '15px' }}>Scuola o istituto che frequento</h4>
             {(() => {
               const schoolTypeData = Object.entries(profileData.school_type.distribution || {})
                 .map(([name, value]) => {
@@ -1320,7 +1599,7 @@ function RespondentProfiles() {
               return (
                 <>
                   <div style={{ marginTop: '20px', overflowX: 'auto' }}>
-                    <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella Dati Scuola/Istituto</h5>
+                    <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella dati scuola/istituto</h5>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
                       <thead>
                         <tr style={{ backgroundColor: '#f1f5f9' }}>
@@ -1375,9 +1654,9 @@ function RespondentProfiles() {
         {(category === 'teachers_active' || category === 'teachers_training') && profileData.school_level && (
           <div style={{ marginBottom: '30px' }}>
             <h4 style={{ color: '#475569', marginBottom: '15px' }}>
-              {category === 'teachers_active' 
-                ? 'Scuola o Istituto in cui Insegno' 
-                : 'Scuola o Istituto in cui Vorrei Insegnare'}
+              {category === 'teachers_active'
+                ? 'Scuola o istituto in cui insegno'
+                : 'Scuola o istituto in cui vorrei insegnare'}
             </h4>
             {(() => {
               const schoolLevelData = Object.entries(profileData.school_level.distribution || {})
@@ -1474,7 +1753,7 @@ function RespondentProfiles() {
               return (
                 <>
                   <div style={{ marginTop: '20px', overflowX: 'auto' }}>
-                    <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella Dati Scuola/Istituto</h5>
+                    <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella dati scuola/istituto</h5>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
                       <thead>
                         <tr style={{ backgroundColor: '#f1f5f9' }}>
@@ -1529,7 +1808,7 @@ function RespondentProfiles() {
         {/* Tipo di Materia: STEM vs Umanistica (solo per insegnanti) */}
         {(category === 'teachers_active' || category === 'teachers_training') && profileData.subject_type && (
           <div style={{ marginBottom: '30px' }}>
-            <h4 style={{ color: '#475569', marginBottom: '15px' }}>Tipo di Materia: STEM vs Umanistica</h4>
+            <h4 style={{ color: '#475569', marginBottom: '15px' }}>Tipo di materia: STEM vs umanistica</h4>
             {(() => {
               const subjectTypeData = Object.entries(profileData.subject_type.distribution || {})
                 .map(([name, value]) => ({
@@ -1627,7 +1906,7 @@ function RespondentProfiles() {
               return (
                 <>
                   <div style={{ marginTop: '20px', overflowX: 'auto' }}>
-                    <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella Dati STEM vs Umanistica</h5>
+                    <h5 style={{ marginBottom: '10px', color: '#475569', fontSize: '0.95em' }}>Tabella dati STEM vs umanistica</h5>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
                       <thead>
                         <tr style={{ backgroundColor: '#f1f5f9' }}>

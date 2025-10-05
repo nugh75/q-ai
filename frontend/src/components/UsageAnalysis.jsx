@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   BarChart,
   Bar,
@@ -56,6 +56,12 @@ function UsageAnalysis() {
   const [factorMetric, setFactorMetric] = useState('uso_quotidiano')
   const [influenceUsage, setInfluenceUsage] = useState('uso_quotidiano')
   const [influenceMetric, setInfluenceMetric] = useState(null)
+
+  // Stati per le modalità di visualizzazione dei grafici
+  const [genderViewMode, setGenderViewMode] = useState('by-group')
+  const [stemViewMode, setStemViewMode] = useState('by-group')
+  const [educationViewMode, setEducationViewMode] = useState('by-group')
+  const [schoolViewMode, setSchoolViewMode] = useState('by-group')
 
   useEffect(() => {
     loadUsageData()
@@ -198,7 +204,12 @@ function UsageAnalysis() {
       {activeTab === 'overview' && renderOverview(data)}
       {activeTab === 'time' && renderTimeAnalysis(data)}
       {activeTab === 'purposes' && renderPurposes(data)}
-      {activeTab === 'factors' && renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMetric, metricOptions)}
+      {activeTab === 'factors' && renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMetric, metricOptions, {
+        genderViewMode, setGenderViewMode,
+        stemViewMode, setStemViewMode,
+        educationViewMode, setEducationViewMode,
+        schoolViewMode, setSchoolViewMode
+      })}
       {activeTab === 'influence' && renderInfluenceFactors(
         data,
         influenceUsage,
@@ -243,14 +254,14 @@ function renderOverview(data) {
       colorNo: '#bfdbfe'
     },
     { 
-      name: 'Docenti Attivi', 
+      name: 'Docenti in Servizio', 
       usano: overviewData.teachers_active.using_ai_daily, 
       nonUsano: overviewData.teachers_active.total - overviewData.teachers_active.using_ai_daily,
       colorYes: COLORS.teachers_active,
       colorNo: '#bbf7d0'
     },
     { 
-      name: 'In Formazione', 
+      name: 'Non in Servizio', 
       usano: overviewData.teachers_training.using_ai_daily, 
       nonUsano: overviewData.teachers_training.total - overviewData.teachers_training.using_ai_daily,
       colorYes: COLORS.teachers_training,
@@ -268,14 +279,14 @@ function renderOverview(data) {
       colorNo: '#bfdbfe'
     },
     { 
-      name: 'Docenti Attivi', 
+      name: 'Docenti in Servizio', 
       usano: overviewData.teachers_active.using_ai_teaching, 
       nonUsano: overviewData.teachers_active.total - overviewData.teachers_active.using_ai_teaching,
       colorYes: COLORS.teachers_active,
       colorNo: '#bbf7d0'
     },
     { 
-      name: 'In Formazione', 
+      name: 'Non in Servizio', 
       usano: overviewData.teachers_training.using_ai_teaching, 
       nonUsano: overviewData.teachers_training.total - overviewData.teachers_training.using_ai_teaching,
       colorYes: COLORS.teachers_training,
@@ -303,7 +314,7 @@ function renderOverview(data) {
       color: COLORS.students
     },
     {
-      name: 'Docenti Attivi',
+      name: 'Docenti in Servizio',
       median: hoursData.teachers_active.daily.median || 0,
       mean: hoursData.teachers_active.daily.mean || 0,
       q1: hoursData.teachers_active.daily.q1 || 0,
@@ -314,7 +325,7 @@ function renderOverview(data) {
       color: COLORS.teachers_active
     },
     {
-      name: 'In Formazione',
+      name: 'Non in Servizio',
       median: hoursData.teachers_training.daily.median || 0,
       mean: hoursData.teachers_training.daily.mean || 0,
       q1: hoursData.teachers_training.daily.q1 || 0,
@@ -340,7 +351,7 @@ function renderOverview(data) {
       color: COLORS.students
     },
     {
-      name: 'Docenti Attivi',
+      name: 'Docenti in Servizio',
       median: hoursData.teachers_active.training?.median || 0,
       mean: hoursData.teachers_active.training?.mean || 0,
       q1: hoursData.teachers_active.training?.q1 || 0,
@@ -351,7 +362,7 @@ function renderOverview(data) {
       color: COLORS.teachers_active
     },
     {
-      name: 'In Formazione',
+      name: 'Non in Servizio',
       median: hoursData.teachers_training.training?.median || 0,
       mean: hoursData.teachers_training.training?.mean || 0,
       q1: hoursData.teachers_training.training?.q1 || 0,
@@ -424,7 +435,7 @@ function renderOverview(data) {
             borderRadius: '8px',
             borderLeft: `4px solid ${COLORS.teachers_active}`
           }}>
-            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>Insegnanti Attivi</div>
+            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>Insegnanti in Servizio</div>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: COLORS.teachers_active, marginBottom: '5px' }}>
               {overviewData.teachers_active.percentage_daily}%
             </div>
@@ -439,7 +450,7 @@ function renderOverview(data) {
             borderRadius: '8px',
             borderLeft: `4px solid ${COLORS.teachers_training}`
           }}>
-            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>In Formazione</div>
+            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>Non in Servizio</div>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: COLORS.teachers_training, marginBottom: '5px' }}>
               {overviewData.teachers_training.percentage_daily}%
             </div>
@@ -512,7 +523,7 @@ function renderOverview(data) {
             borderRadius: '8px',
             borderLeft: `4px solid ${COLORS.teachers_active}`
           }}>
-            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>Insegnanti Attivi (Didattica)</div>
+            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>Insegnanti in Servizio (Didattica)</div>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: COLORS.teachers_active, marginBottom: '5px' }}>
               {overviewData.teachers_active.percentage_teaching}%
             </div>
@@ -527,7 +538,7 @@ function renderOverview(data) {
             borderRadius: '8px',
             borderLeft: `4px solid ${COLORS.teachers_training}`
           }}>
-            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>In Formazione (Didattica)</div>
+            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>Non in Servizio (Didattica)</div>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: COLORS.teachers_training, marginBottom: '5px' }}>
               {overviewData.teachers_training.percentage_teaching}%
             </div>
@@ -778,7 +789,7 @@ function renderOverview(data) {
             borderRadius: '8px',
             borderLeft: `4px solid ${COLORS.teachers_active}`
           }}>
-            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>Insegnanti Attivi (Formazione)</div>
+            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>Insegnanti in Servizio (Formazione)</div>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: COLORS.teachers_active, marginBottom: '5px' }}>
               {hoursData.teachers_active.training?.mean?.toFixed(1) || 0}h
             </div>
@@ -793,7 +804,7 @@ function renderOverview(data) {
             borderRadius: '8px',
             borderLeft: `4px solid ${COLORS.teachers_training}`
           }}>
-            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>In Formazione</div>
+            <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '8px' }}>Non in Servizio</div>
             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: COLORS.teachers_training, marginBottom: '5px' }}>
               {hoursData.teachers_training.training?.mean?.toFixed(1) || 0}h
             </div>
@@ -879,6 +890,27 @@ function renderOverview(data) {
                   />
                 </ComposedChart>
               </ResponsiveContainer>
+
+              {/* Nota sulla scala del grafico */}
+              {group.outliers && group.outliers.some(outlier => outlier > 12) && (
+                <div style={{
+                  marginTop: '15px',
+                  padding: '12px',
+                  backgroundColor: '#fffbeb',
+                  borderRadius: '8px',
+                  border: '1px solid #fbbf24'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <Icons.Info className="w-4 h-4" style={{ color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
+                    <div style={{ fontSize: '0.8rem', color: '#92400e', lineHeight: '1.4' }}>
+                      <strong>Nota sulla scala:</strong> Il grafico mostra valori fino a 12 ore/settimana per garantire leggibilità.
+                      {group.outliers.filter(o => o > 12).length > 0 && (
+                        <> Esistono <strong>{group.outliers.filter(o => o > 12).length} outlier{group.outliers.filter(o => o > 12).length > 1 ? 's' : ''}</strong> con valori superiori a 12h (max: <strong>{Math.max(...group.outliers).toFixed(1)}h</strong>/sett) che non vengono visualizzati nel grafico ma sono riportati nella sezione outliers sottostante.</>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Statistiche gruppo */}
               <div style={{
@@ -978,8 +1010,8 @@ function renderOverview(data) {
             <strong style={{ color: '#991b1b' }}>Power Users identificati:</strong>
             <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', color: '#7f1d1d' }}>
               <li><strong>Studenti:</strong> 16 outliers (range: 18-56h/settimana) - utilizzo intensivo per studio e ricerca</li>
-              <li><strong>Docenti Attivi:</strong> 16 outliers (range: 10-50h/settimana) - integrazione estensiva nella didattica</li>
-              <li><strong>In Formazione:</strong> 3 outliers (range: 8-10h/settimana) - sperimentazione iniziale avanzata</li>
+              <li><strong>Docenti in Servizio:</strong> 16 outliers (range: 10-50h/settimana) - integrazione estensiva nella didattica</li>
+              <li><strong>Non in Servizio:</strong> 3 outliers (range: 8-10h/settimana) - sperimentazione iniziale avanzata</li>
             </ul>
           </div>
         </div>
@@ -996,12 +1028,12 @@ function renderOverview(data) {
               <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '5px' }}>Gap: 5.5% - uso prevalentemente educativo</div>
             </div>
             <div style={{ backgroundColor: '#f0fdf4', padding: '15px', borderRadius: '8px' }}>
-              <div style={{ fontWeight: 'bold', color: COLORS.teachers_active, marginBottom: '5px' }}>Docenti Attivi</div>
+              <div style={{ fontWeight: 'bold', color: COLORS.teachers_active, marginBottom: '5px' }}>Docenti in Servizio</div>
               <div style={{ fontSize: '0.9rem', color: '#14532d' }}>56.7% uso quotidiano → 45.0% didattica</div>
               <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '5px' }}>Gap: 11.7% - resistenza all'uso didattico?</div>
             </div>
             <div style={{ backgroundColor: '#fffbeb', padding: '15px', borderRadius: '8px' }}>
-              <div style={{ fontWeight: 'bold', color: COLORS.teachers_training, marginBottom: '5px' }}>In Formazione</div>
+              <div style={{ fontWeight: 'bold', color: COLORS.teachers_training, marginBottom: '5px' }}>Non in Servizio</div>
               <div style={{ fontSize: '0.9rem', color: '#78350f' }}>51.5% uso quotidiano → 28.3% didattica</div>
               <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '5px' }}>Gap: 23.2% - ancora in fase esplorativa</div>
             </div>
@@ -1023,11 +1055,11 @@ function renderOverview(data) {
             Generazione "AI-native" che integra naturalmente l'IA nello studio, ma con grande variabilità individuale.
           </p>
           <p style={{ color: '#475569', lineHeight: '1.7', margin: '0 0 12px 0' }}>
-            <strong>Docenti Attivi (mediana: 2h/settimana):</strong> Adozione moderata (56.7%) con distribuzione più omogenea (Q1=1h, Q3=3h). 
+            <strong>Docenti in Servizio (mediana: 2h/settimana):</strong> Adozione moderata (56.7%) con distribuzione più omogenea (Q1=1h, Q3=3h). 
             Il 45% usa l'IA per la didattica, suggerendo che circa metà dei docenti è ancora in fase esplorativa o scettica sull'uso educativo.
           </p>
           <p style={{ color: '#475569', lineHeight: '1.7', margin: 0 }}>
-            <strong>In Formazione (mediana: 2h/settimana):</strong> Pattern simile ai colleghi attivi ma con gap didattico più ampio (28.3%). 
+            <strong>Non in Servizio (mediana: 2h/settimana):</strong> Pattern simile ai colleghi attivi ma con gap didattico più ampio (28.3%). 
             Stanno ancora costruendo le competenze necessarie per integrare efficacemente l'IA nella pratica didattica.
           </p>
         </div>
@@ -1216,7 +1248,7 @@ function renderTimeAnalysis(data) {
       domain: [0, 14]
     },
     {
-      name: 'Docenti Attivi',
+      name: 'Docenti in Servizio',
       group: 'teachers_active',
       median: hoursData.teachers_active.daily.median || 0,
       q1: hoursData.teachers_active.daily.q1 || 0,
@@ -1228,7 +1260,7 @@ function renderTimeAnalysis(data) {
       domain: [0, 14]
     },
     {
-      name: 'In Formazione',
+      name: 'Non in Servizio',
       group: 'teachers_training',
       median: hoursData.teachers_training.daily.median || 0,
       q1: hoursData.teachers_training.daily.q1 || 0,
@@ -1257,7 +1289,7 @@ function renderTimeAnalysis(data) {
   // Box plot data per Preparazione Lezioni
   const lessonPlanningBoxData = [
     {
-      name: 'Docenti Attivi',
+      name: 'Docenti in Servizio',
       median: hoursData.teachers_active.lesson_planning.median || 0,
       q1: hoursData.teachers_active.lesson_planning.q1 || 0,
       q3: hoursData.teachers_active.lesson_planning.q3 || 0,
@@ -1272,7 +1304,7 @@ function renderTimeAnalysis(data) {
   // Box plot data per Formazione/Autoapprendimento
   const trainingBoxData = [
     {
-      name: 'Docenti Attivi',
+      name: 'Docenti in Servizio',
       median: hoursData.teachers_active.training.median || 0,
       q1: hoursData.teachers_active.training.q1 || 0,
       q3: hoursData.teachers_active.training.q3 || 0,
@@ -1283,7 +1315,7 @@ function renderTimeAnalysis(data) {
       domain: [0, 14]
     },
     {
-      name: 'In Formazione',
+      name: 'Non in Servizio',
       median: hoursData.teachers_training.training.median || 0,
       q1: hoursData.teachers_training.training.q1 || 0,
       q3: hoursData.teachers_training.training.q3 || 0,
@@ -1379,7 +1411,7 @@ function renderTimeAnalysis(data) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <Icons.Teacher className="w-5 h-5" style={{ color: COLORS.teachers_active }} />
-              <h4 style={{ margin: 0, color: '#334155', fontSize: '1rem' }}>Docenti Attivi</h4>
+              <h4 style={{ margin: 0, color: '#334155', fontSize: '1rem' }}>Docenti in Servizio</h4>
             </div>
             <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -1409,7 +1441,7 @@ function renderTimeAnalysis(data) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <Icons.Teacher className="w-5 h-5" style={{ color: COLORS.teachers_training }} />
-              <h4 style={{ margin: 0, color: '#334155', fontSize: '1rem' }}>In Formazione</h4>
+              <h4 style={{ margin: 0, color: '#334155', fontSize: '1rem' }}>Non in Servizio</h4>
             </div>
             <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -1596,7 +1628,7 @@ function renderTimeAnalysis(data) {
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
           gap: '25px'
         }}>
-          {/* Docenti Attivi */}
+          {/* Docenti in Servizio */}
           <div>
             <h4 style={{
               color: '#334155',
@@ -1612,7 +1644,7 @@ function renderTimeAnalysis(data) {
                 borderRadius: '50%',
                 backgroundColor: COLORS.teachers_active
               }}></div>
-              Docenti Attivi
+              Docenti in Servizio
             </h4>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -1652,7 +1684,7 @@ function renderTimeAnalysis(data) {
             </div>
           </div>
 
-          {/* Docenti in Formazione */}
+          {/* Docenti Non in Servizio */}
           <div>
             <h4 style={{
               color: '#334155',
@@ -1668,7 +1700,7 @@ function renderTimeAnalysis(data) {
                 borderRadius: '50%',
                 backgroundColor: COLORS.teachers_training
               }}></div>
-              Docenti in Formazione
+              Docenti Non in Servizio
             </h4>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -1791,7 +1823,7 @@ function renderPurposes(data) {
         )}
       </section>
 
-      {/* Docenti Attivi */}
+      {/* Docenti in Servizio */}
       <section style={{
         backgroundColor: 'white',
         padding: '25px',
@@ -1801,7 +1833,7 @@ function renderPurposes(data) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
           <Icons.Teacher className="w-6 h-6" style={{ color: COLORS.teachers_active }} />
-          <h3 style={{ margin: 0, color: '#334155', fontSize: '1.25rem' }}>Attività Didattiche - Docenti Attivi</h3>
+          <h3 style={{ margin: 0, color: '#334155', fontSize: '1.25rem' }}>Attività Didattiche - Docenti in Servizio</h3>
         </div>
 
         {purposesData.teachers_active.length > 0 ? (
@@ -1871,12 +1903,12 @@ function renderPurposes(data) {
         ) : (
           <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
             <Icons.Category className="w-12 h-12" style={{ margin: '0 auto 10px', opacity: 0.5 }} />
-            <p>Nessun dato disponibile per i docenti attivi</p>
+            <p>Nessun dato disponibile per i docenti in servizio</p>
           </div>
         )}
       </section>
 
-      {/* Docenti in Formazione */}
+      {/* Docenti Non in Servizio */}
       <section style={{
         backgroundColor: 'white',
         padding: '25px',
@@ -1886,7 +1918,7 @@ function renderPurposes(data) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
           <Icons.Teacher className="w-6 h-6" style={{ color: COLORS.teachers_training }} />
-          <h3 style={{ margin: 0, color: '#334155', fontSize: '1.25rem' }}>Attività Didattiche - Docenti in Formazione</h3>
+          <h3 style={{ margin: 0, color: '#334155', fontSize: '1.25rem' }}>Attività Didattiche - Docenti Non in Servizio</h3>
         </div>
 
         {purposesData.teachers_training.length > 0 ? (
@@ -1981,15 +2013,17 @@ function renderPurposes(data) {
   )
 }
 
-
 // ========== SEZIONE FATTORI DI INFLUENZA ==========
-function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMetric, metricOptions) {
+function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMetric, metricOptions, viewModes) {
   const factorsData = data.factors || {}
+  const { genderViewMode, setGenderViewMode, stemViewMode, setStemViewMode, educationViewMode, setEducationViewMode, schoolViewMode, setSchoolViewMode } = viewModes
 
   const factorTabs = [
     { key: 'age', label: 'Età', icon: Icons.Users },
     { key: 'gender', label: 'Genere', icon: Icons.Users },
-    { key: 'stem', label: 'STEM vs Umanistico', icon: Icons.Category }
+    { key: 'stem', label: 'STEM vs Umanistico', icon: Icons.Category },
+    { key: 'education', label: 'Titolo di Studio', icon: Icons.Book },
+    { key: 'school', label: 'Scuola/Istituto', icon: Icons.Building }
   ]
 
   const selectedMetric = metricOptions.find(option => option.key === factorMetric) || metricOptions[0] || {
@@ -2008,11 +2042,23 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
   const renderAgeAnalysis = () => {
     const metricAgeData = factorsData.age?.[factorMetric] || {}
 
-    const allAgeData = [
+    const allAgeDataRaw = [
       ...(metricAgeData.students || []).map(d => ({ ...d, group: 'Studenti', color: COLORS.students })),
-      ...(metricAgeData.teachers_active || []).map(d => ({ ...d, group: 'Docenti Attivi', color: COLORS.teachers_active })),
-      ...(metricAgeData.teachers_training || []).map(d => ({ ...d, group: 'In Formazione', color: COLORS.teachers_training }))
+      ...(metricAgeData.teachers_active || []).map(d => ({ ...d, group: 'Docenti in Servizio', color: COLORS.teachers_active })),
+      ...(metricAgeData.teachers_training || []).map(d => ({ ...d, group: 'Non in Servizio', color: COLORS.teachers_training }))
     ]
+
+    // Calcola statistiche outlier PRIMA di limitare i valori
+    const maxHours = Math.max(...allAgeDataRaw.map(d => d.hours || 0))
+    const SCALE_LIMIT = 20
+    const outliersAboveLimit = allAgeDataRaw.filter(d => d.hours > SCALE_LIMIT)
+    const hasOutliers = outliersAboveLimit.length > 0
+
+    // Limita i valori al massimo per la visualizzazione
+    const allAgeData = allAgeDataRaw.map(d => ({
+      ...d,
+      hours: Math.min(d.hours || 0, SCALE_LIMIT)
+    }))
 
     return (
       <div>
@@ -2024,37 +2070,88 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
         </div>
 
         {allAgeData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={400}>
-            <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis
-                dataKey="age"
-                name="Età"
-                type="number"
-                label={{ value: 'Età', position: 'insideBottom', offset: -10, fill: '#64748b' }}
-                tick={{ fill: '#64748b' }}
-              />
-              <YAxis
-                dataKey="hours"
-                name="Ore"
-                label={{ value: 'Ore settimanali', angle: -90, position: 'insideLeft', fill: '#64748b' }}
-                tick={{ fill: '#64748b' }}
-              />
-              <Tooltip
-                cursor={{ strokeDasharray: '3 3' }}
-                contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
-                formatter={(value, name) => {
-                  if (name === 'Età') return [value, 'Età']
-                  if (name === 'Ore') return [value + 'h', 'Ore settimanali']
-                  return [value, name]
-                }}
-              />
-              <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ paddingBottom: 8 }} />
-              <Scatter name="Studenti" data={metricAgeData.students || []} fill={COLORS.students} />
-              <Scatter name="Docenti Attivi" data={metricAgeData.teachers_active || []} fill={COLORS.teachers_active} />
-              <Scatter name="In Formazione" data={metricAgeData.teachers_training || []} fill={COLORS.teachers_training} />
-            </ScatterChart>
-          </ResponsiveContainer>
+          <>
+            <ResponsiveContainer width="100%" height={400}>
+              <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis
+                  dataKey="age"
+                  name="Età"
+                  type="number"
+                  label={{ value: 'Età', position: 'insideBottom', offset: -10, fill: '#64748b' }}
+                  tick={{ fill: '#64748b' }}
+                />
+                <YAxis
+                  dataKey="hours"
+                  name="Ore"
+                  domain={[0, SCALE_LIMIT]}
+                  label={{ value: 'Ore settimanali', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                  tick={{ fill: '#64748b' }}
+                />
+                <Tooltip
+                  cursor={{ strokeDasharray: '3 3' }}
+                  contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                  formatter={(value, name) => {
+                    if (name === 'Età') return [value, 'Età']
+                    if (name === 'Ore') return [value + 'h', 'Ore settimanali']
+                    return [value, name]
+                  }}
+                />
+                <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ paddingBottom: 8 }} />
+                <Scatter
+                  name="Studenti"
+                  data={(metricAgeData.students || []).map(d => ({ ...d, hours: Math.min(d.hours || 0, SCALE_LIMIT) }))}
+                  fill={COLORS.students}
+                />
+                <Scatter
+                  name="Docenti in Servizio"
+                  data={(metricAgeData.teachers_active || []).map(d => ({ ...d, hours: Math.min(d.hours || 0, SCALE_LIMIT) }))}
+                  fill={COLORS.teachers_active}
+                />
+                <Scatter
+                  name="Non in Servizio"
+                  data={(metricAgeData.teachers_training || []).map(d => ({ ...d, hours: Math.min(d.hours || 0, SCALE_LIMIT) }))}
+                  fill={COLORS.teachers_training}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+
+            {/* Note metodologiche e sulla scala */}
+            <div style={{
+              marginTop: '20px',
+              padding: '12px',
+              backgroundColor: hasOutliers ? '#fffbeb' : '#f0f9ff',
+              borderRadius: '8px',
+              border: hasOutliers ? '1px solid #fbbf24' : '1px solid #bae6fd'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                <Icons.Info className="w-4 h-4" style={{ color: hasOutliers ? '#d97706' : '#0369a1', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '0.85rem', color: hasOutliers ? '#92400e' : '#0c4a6e', lineHeight: '1.4' }}>
+                  {hasOutliers && (
+                    <>
+                      <div style={{ marginBottom: '12px' }}>
+                        <strong>Nota sulla scala:</strong> Il grafico mostra valori fino a {SCALE_LIMIT} ore/settimana per garantire leggibilità.
+                        Esistono <strong>{outliersAboveLimit.length} valore{outliersAboveLimit.length > 1 ? 'i' : ''}</strong> superiore{outliersAboveLimit.length > 1 ? 'i' : ''} a {SCALE_LIMIT}h (max: <strong>{maxHours.toFixed(1)}h</strong>/sett) che {outliersAboveLimit.length > 1 ? 'vengono visualizzati' : 'viene visualizzato'} al limite superiore del grafico.
+                      </div>
+                      {outliersAboveLimit.length <= 10 && (
+                        <div style={{ marginBottom: '12px', fontSize: '0.8rem' }}>
+                          <strong>Valori oltre {SCALE_LIMIT}h:</strong> {outliersAboveLimit.map(d => `${d.hours.toFixed(1)}h (età ${d.age})`).join(', ')}
+                        </div>
+                      )}
+                      {outliersAboveLimit.length > 10 && (
+                        <div style={{ marginBottom: '12px', fontSize: '0.8rem' }}>
+                          <strong>{outliersAboveLimit.length} valori oltre {SCALE_LIMIT}h</strong> (range: {Math.min(...outliersAboveLimit.map(d => d.hours)).toFixed(1)}h - {maxHours.toFixed(1)}h)
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div>
+                    <strong>Nota metodologica:</strong> I dati mostrano medie e dispersioni calcolate sui soli rispondenti che hanno dichiarato ore dedicate al contesto selezionato. I valori possono variare sensibilmente al variare del campione disponibile per ciascun segmento.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
         ) : (
           <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
             <Icons.Chart className="w-12 h-12" style={{ margin: '0 auto 10px', opacity: 0.5 }} />
@@ -2108,6 +2205,53 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
           </p>
         </div>
 
+        {/* Toggle per cambiare modalità di visualizzazione */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '12px',
+          marginBottom: '24px',
+          padding: '8px',
+          backgroundColor: '#f8fafc',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <button
+            onClick={() => setGenderViewMode('by-group')}
+            style={{
+              flex: 1,
+              maxWidth: '250px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: genderViewMode === 'by-group' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
+              backgroundColor: genderViewMode === 'by-group' ? '#dbeafe' : 'white',
+              color: genderViewMode === 'by-group' ? '#1e40af' : '#64748b',
+              cursor: 'pointer',
+              fontWeight: genderViewMode === 'by-group' ? '600' : '400',
+              transition: 'all 0.2s'
+            }}
+          >
+            Confronta per gruppo
+          </button>
+          <button
+            onClick={() => setGenderViewMode('by-gender')}
+            style={{
+              flex: 1,
+              maxWidth: '250px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: genderViewMode === 'by-gender' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
+              backgroundColor: genderViewMode === 'by-gender' ? '#dbeafe' : 'white',
+              color: genderViewMode === 'by-gender' ? '#1e40af' : '#64748b',
+              cursor: 'pointer',
+              fontWeight: genderViewMode === 'by-gender' ? '600' : '400',
+              transition: 'all 0.2s'
+            }}
+          >
+            Confronta per genere
+          </button>
+        </div>
+
         <div style={{
           backgroundColor: '#f8fafc',
           border: '1px solid #cbd5f5',
@@ -2121,7 +2265,7 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
           <Icons.Info className="w-5 h-5" style={{ color: '#1d4ed8', flexShrink: 0, marginTop: '2px' }} />
           <div style={{ color: '#1f2937', fontSize: '0.9rem', lineHeight: '1.6' }}>
             <strong>Campione limitato:</strong> consideriamo solo chi <strong>usa l'IA</strong> per "{metricLabelLower}" e ha indicato quante ore dedica.
-            Questo riduce il numero di risposte rispetto al totale degli intervistati (studenti n={totalsByGroup.students}, docenti attivi n={totalsByGroup.teachersActive}, docenti in formazione n={totalsByGroup.teachersTraining}).
+            Questo riduce il numero di risposte rispetto al totale degli intervistati (studenti n={totalsByGroup.students}, docenti in servizio n={totalsByGroup.teachersActive}, docenti in formazione n={totalsByGroup.teachersTraining}).
           </div>
         </div>
 
@@ -2159,7 +2303,7 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
                 <td style={{ padding: '12px', color: '#334155', fontWeight: '500' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: COLORS.teachers_active }}></div>
-                    Docenti Attivi
+                    Docenti in Servizio
                   </div>
                 </td>
                 {genderKeys.map(gender => {
@@ -2176,7 +2320,7 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
                 <td style={{ padding: '12px', color: '#334155', fontWeight: '500' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: COLORS.teachers_training }}></div>
-                    In Formazione
+                    Non in Servizio
                   </div>
                 </td>
                 {genderKeys.map(gender => {
@@ -2193,33 +2337,108 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
           </table>
         </div>
 
-        {genderChartData.length > 0 && (
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={genderChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="gender" tick={{ fill: '#64748b' }} />
-              <YAxis
-                label={{ value: 'Ore settimanali', angle: -90, position: 'insideLeft', fill: '#64748b' }}
-                tick={{ fill: '#64748b' }}
-              />
-              <Tooltip
-                contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
-                formatter={(value, name, entry) => {
-                  const countKey =
-                    name === 'Studenti'
-                      ? 'studenti_count'
-                      : name === 'Docenti Attivi'
-                        ? 'docenti_attivi_count'
-                        : 'in_formazione_count'
-                  const count = entry?.payload?.[countKey] || 0
-                  return [`${value}h (n=${count})`, name]
-                }}
-              />
-              <Bar dataKey="studenti" name="Studenti" fill={COLORS.students} radius={[8, 8, 0, 0]} />
-              <Bar dataKey="docenti_attivi" name="Docenti Attivi" fill={COLORS.teachers_active} radius={[8, 8, 0, 0]} />
-              <Bar dataKey="in_formazione" name="In Formazione" fill={COLORS.teachers_training} radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        {genderViewMode === 'by-group' ? (
+          // Modalità "Confronta per gruppo": un solo grafico con i generi sull'asse X
+          genderChartData.length > 0 && (
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={genderChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="gender" tick={{ fill: '#64748b' }} />
+                <YAxis
+                  label={{ value: 'Ore settimanali', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                  tick={{ fill: '#64748b' }}
+                />
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                  formatter={(value, name, entry) => {
+                    const countKey =
+                      name === 'Studenti'
+                        ? 'studenti_count'
+                        : name === 'Docenti in Servizio'
+                          ? 'docenti_attivi_count'
+                          : 'in_formazione_count'
+                    const count = entry?.payload?.[countKey] || 0
+                    return [`${value}h (n=${count})`, name]
+                  }}
+                />
+                <Bar dataKey="studenti" name="Studenti" fill={COLORS.students} radius={[8, 8, 0, 0]} />
+                <Bar dataKey="docenti_attivi" name="Docenti in Servizio" fill={COLORS.teachers_active} radius={[8, 8, 0, 0]} />
+                <Bar dataKey="in_formazione" name="Non in Servizio" fill={COLORS.teachers_training} radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )
+        ) : (
+          // Modalità "Confronta per genere": un grafico per ogni genere
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '24px',
+            marginTop: '20px'
+          }}>
+            {genderKeys.map(gender => {
+              const genderSpecificData = [{
+                category: 'Studenti',
+                value: genderMetricData.students?.[gender]?.mean || 0,
+                count: genderMetricData.students?.[gender]?.count || 0,
+                color: COLORS.students
+              }, {
+                category: 'Docenti in Servizio',
+                value: genderMetricData.teachers_active?.[gender]?.mean || 0,
+                count: genderMetricData.teachers_active?.[gender]?.count || 0,
+                color: COLORS.teachers_active
+              }, {
+                category: 'Non in Servizio',
+                value: genderMetricData.teachers_training?.[gender]?.mean || 0,
+                count: genderMetricData.teachers_training?.[gender]?.count || 0,
+                color: COLORS.teachers_training
+              }]
+
+              return (
+                <div key={gender} style={{
+                  backgroundColor: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                  <h5 style={{
+                    textAlign: 'center',
+                    color: '#334155',
+                    marginBottom: '16px',
+                    fontSize: '1rem',
+                    fontWeight: '600'
+                  }}>
+                    {gender}
+                  </h5>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={genderSpecificData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis
+                        dataKey="category"
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                        angle={-15}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis
+                        label={{ value: 'Ore', angle: -90, position: 'insideLeft', fill: '#64748b', fontSize: 12 }}
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                        formatter={(value, name, entry) => [`${value}h (n=${entry.payload.count})`, entry.payload.category]}
+                      />
+                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                        {genderSpecificData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
     )
@@ -2238,7 +2457,7 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
         color: COLORS.students
       },
       {
-        group: 'Docenti Attivi',
+        group: 'Docenti in Servizio',
         stem: metricStemData.teachers_active?.stem?.mean || 0,
         humanistic: metricStemData.teachers_active?.humanistic?.mean || 0,
         stem_count: metricStemData.teachers_active?.stem?.count || 0,
@@ -2246,7 +2465,7 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
         color: COLORS.teachers_active
       },
       {
-        group: 'In Formazione',
+        group: 'Non in Servizio',
         stem: metricStemData.teachers_training?.stem?.mean || 0,
         humanistic: metricStemData.teachers_training?.humanistic?.mean || 0,
         stem_count: metricStemData.teachers_training?.stem?.count || 0,
@@ -2275,71 +2494,710 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
           </p>
         </div>
 
+        {/* Toggle per cambiare modalità di visualizzazione */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '20px',
-          marginBottom: '30px'
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '12px',
+          marginBottom: '24px',
+          padding: '8px',
+          backgroundColor: '#f8fafc',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0'
         }}>
-          {stemData.map(item => (
-            <div
-              key={item.group}
-              style={{
-                backgroundColor: item.color === COLORS.students ? '#eff6ff' : item.color === COLORS.teachers_active ? '#f0fdf4' : '#fef3c7',
-                padding: '20px',
-                borderRadius: '8px',
-                border: '2px solid rgba(148, 163, 184, 0.3)'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
-                <Icons.Info className="w-5 h-5" style={{ color: item.color }} />
-                <h4 style={{ margin: 0, color: '#334155', fontSize: '1rem' }}>{item.group}</h4>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.9rem' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ color: '#64748b', marginBottom: '5px' }}>STEM</div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: item.color }}>
-                    {item.stem || 0}h
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                    ({item.stem_count || 0} risp.)
-                  </div>
-                </div>
-                <div style={{ borderLeft: '2px solid rgba(148, 163, 184, 0.4)', margin: '0 10px' }}></div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ color: '#64748b', marginBottom: '5px' }}>Umanistico</div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: item.color }}>
-                    {item.humanistic || 0}h
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                    ({item.humanistic_count || 0} risp.)
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+          <button
+            onClick={() => setStemViewMode('by-group')}
+            style={{
+              flex: 1,
+              maxWidth: '250px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: stemViewMode === 'by-group' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
+              backgroundColor: stemViewMode === 'by-group' ? '#dbeafe' : 'white',
+              color: stemViewMode === 'by-group' ? '#1e40af' : '#64748b',
+              cursor: 'pointer',
+              fontWeight: stemViewMode === 'by-group' ? '600' : '400',
+              transition: 'all 0.2s'
+            }}
+          >
+            Confronta per gruppo
+          </button>
+          <button
+            onClick={() => setStemViewMode('by-path')}
+            style={{
+              flex: 1,
+              maxWidth: '250px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: stemViewMode === 'by-path' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
+              backgroundColor: stemViewMode === 'by-path' ? '#dbeafe' : 'white',
+              color: stemViewMode === 'by-path' ? '#1e40af' : '#64748b',
+              cursor: 'pointer',
+              fontWeight: stemViewMode === 'by-path' ? '600' : '400',
+              transition: 'all 0.2s'
+            }}
+          >
+            Confronta per percorso
+          </button>
         </div>
 
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={stemData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="group" tick={{ fill: '#64748b' }} />
-            <YAxis
-              label={{ value: 'Ore settimanali', angle: -90, position: 'insideLeft', fill: '#64748b' }}
-              tick={{ fill: '#64748b' }}
-            />
-            <Tooltip
-              contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
-              formatter={(value, name, entry) => {
-                const countKey = name === 'STEM' ? 'stem_count' : 'humanistic_count'
-                const count = entry?.payload?.[countKey] || 0
-                return [`${value}h (n=${count})`, name]
-              }}
-            />
-            <Bar dataKey="stem" name="STEM" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="humanistic" name="Umanistico" fill="#ec4899" radius={[8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        {stemViewMode === 'by-group' ? (
+          // Modalità "Confronta per gruppo": visualizzazione attuale
+          <>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: '20px',
+              marginBottom: '30px'
+            }}>
+              {stemData.map(item => (
+                <div
+                  key={item.group}
+                  style={{
+                    backgroundColor: item.color === COLORS.students ? '#eff6ff' : item.color === COLORS.teachers_active ? '#f0fdf4' : '#fef3c7',
+                    padding: '20px',
+                    borderRadius: '8px',
+                    border: '2px solid rgba(148, 163, 184, 0.3)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+                    <Icons.Info className="w-5 h-5" style={{ color: item.color }} />
+                    <h4 style={{ margin: 0, color: '#334155', fontSize: '1rem' }}>{item.group}</h4>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: '0.9rem' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: '#64748b', marginBottom: '5px' }}>STEM</div>
+                      <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: item.color }}>
+                        {item.stem || 0}h
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                        ({item.stem_count || 0} risp.)
+                      </div>
+                    </div>
+                    <div style={{ borderLeft: '2px solid rgba(148, 163, 184, 0.4)', margin: '0 10px' }}></div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: '#64748b', marginBottom: '5px' }}>Umanistico</div>
+                      <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: item.color }}>
+                        {item.humanistic || 0}h
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                        ({item.humanistic_count || 0} risp.)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={stemData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="group" tick={{ fill: '#64748b' }} />
+                <YAxis
+                  label={{ value: 'Ore settimanali', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                  tick={{ fill: '#64748b' }}
+                />
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                  formatter={(value, name, entry) => {
+                    const countKey = name === 'STEM' ? 'stem_count' : 'humanistic_count'
+                    const count = entry?.payload?.[countKey] || 0
+                    return [`${value}h (n=${count})`, name]
+                  }}
+                />
+                <Bar dataKey="stem" name="STEM" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="humanistic" name="Umanistico" fill="#ec4899" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </>
+        ) : (
+          // Modalità "Confronta per percorso": un grafico per STEM e uno per Umanistico
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+            gap: '24px',
+            marginTop: '20px'
+          }}>
+            {['stem', 'humanistic'].map(pathType => {
+              const pathLabel = pathType === 'stem' ? 'STEM' : 'Umanistico'
+              const pathColor = pathType === 'stem' ? '#8b5cf6' : '#ec4899'
+
+              const pathSpecificData = [{
+                category: 'Studenti',
+                value: metricStemData.students?.[pathType]?.mean || 0,
+                count: metricStemData.students?.[pathType]?.count || 0,
+                color: COLORS.students
+              }, {
+                category: 'Docenti in Servizio',
+                value: metricStemData.teachers_active?.[pathType]?.mean || 0,
+                count: metricStemData.teachers_active?.[pathType]?.count || 0,
+                color: COLORS.teachers_active
+              }, {
+                category: 'Non in Servizio',
+                value: metricStemData.teachers_training?.[pathType]?.mean || 0,
+                count: metricStemData.teachers_training?.[pathType]?.count || 0,
+                color: COLORS.teachers_training
+              }]
+
+              return (
+                <div key={pathType} style={{
+                  backgroundColor: 'white',
+                  border: `2px solid ${pathColor}`,
+                  borderRadius: '10px',
+                  padding: '16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                  <h5 style={{
+                    textAlign: 'center',
+                    color: pathColor,
+                    marginBottom: '16px',
+                    fontSize: '1.1rem',
+                    fontWeight: '600'
+                  }}>
+                    {pathLabel}
+                  </h5>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={pathSpecificData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis
+                        dataKey="category"
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                        angle={-15}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis
+                        label={{ value: 'Ore', angle: -90, position: 'insideLeft', fill: '#64748b', fontSize: 12 }}
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                        formatter={(value, name, entry) => [`${value}h (n=${entry.payload.count})`, entry.payload.category]}
+                      />
+                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                        {pathSpecificData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderEducationAnalysis = () => {
+    const educationMetricData = factorsData.education?.[factorMetric] || {}
+    const educationKeys = Array.from(new Set([
+      ...Object.keys(educationMetricData.students || {}),
+      ...Object.keys(educationMetricData.teachers_active || {}),
+      ...Object.keys(educationMetricData.teachers_training || {})
+    ]))
+
+    if (educationKeys.length === 0) {
+      return (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+          <Icons.Book className="w-12 h-12" style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+          <p>Dati insufficienti per analizzare le differenze per titolo di studio</p>
+        </div>
+      )
+    }
+
+    // Dati per visualizzazione "per gruppo" (attuale)
+    const educationChartDataByGroup = educationKeys.map(edu => ({
+      education: edu,
+      studenti: educationMetricData.students?.[edu]?.mean || 0,
+      studenti_count: educationMetricData.students?.[edu]?.count || 0,
+      docenti_attivi: educationMetricData.teachers_active?.[edu]?.mean || 0,
+      docenti_attivi_count: educationMetricData.teachers_active?.[edu]?.count || 0,
+      non_servizio: educationMetricData.teachers_training?.[edu]?.mean || 0,
+      non_servizio_count: educationMetricData.teachers_training?.[edu]?.count || 0
+    }))
+
+    // Dati per visualizzazione "per titolo di studio" (nuova)
+    const groupsData = [
+      { key: 'students', label: 'Studenti', color: COLORS.students },
+      { key: 'teachers_active', label: 'Docenti in Servizio', color: COLORS.teachers_active },
+      { key: 'teachers_training', label: 'Non in Servizio', color: COLORS.teachers_training }
+    ]
+
+    return (
+      <div>
+        <div style={{ marginBottom: '20px' }}>
+          <h4 style={{ color: '#334155', marginBottom: '10px', fontSize: '1.1rem' }}>Titolo di Studio - {metricLabel}</h4>
+          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+            Ore medie settimanali per titolo di studio tra chi utilizza l'IA in questo contesto.
+          </p>
+        </div>
+
+        {/* Toggle visualizzazione */}
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          marginBottom: '20px',
+          padding: '8px',
+          backgroundColor: '#f8fafc',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <button
+            onClick={() => setEducationViewMode('by-group')}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: educationViewMode === 'by-group' ? '#3b82f6' : 'white',
+              color: educationViewMode === 'by-group' ? 'white' : '#64748b',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
+          >
+            Confronta per gruppo
+          </button>
+          <button
+            onClick={() => setEducationViewMode('by-education')}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: educationViewMode === 'by-education' ? '#3b82f6' : 'white',
+              color: educationViewMode === 'by-education' ? 'white' : '#64748b',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
+          >
+            Confronta per titolo di studio
+          </button>
+        </div>
+
+        <div style={{ marginBottom: '30px', overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                <th style={{ padding: '12px', textAlign: 'left', color: '#334155', fontWeight: '600' }}>Gruppo</th>
+                {educationKeys.map(edu => (
+                  <th key={edu} style={{ padding: '12px', textAlign: 'center', color: '#334155', fontWeight: '600' }}>
+                    {edu}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <td style={{ padding: '12px', color: '#334155', fontWeight: '500' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: COLORS.students }}></div>
+                    Studenti
+                  </div>
+                </td>
+                {educationKeys.map(edu => {
+                  const stats = educationMetricData.students?.[edu] || {}
+                  return (
+                    <td key={edu} style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>
+                      <strong>{stats.mean || 0}h</strong>
+                      <div style={{ fontSize: '0.8rem' }}>({stats.count || 0} risp.)</div>
+                    </td>
+                  )
+                })}
+              </tr>
+              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <td style={{ padding: '12px', color: '#334155', fontWeight: '500' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: COLORS.teachers_active }}></div>
+                    Docenti in Servizio
+                  </div>
+                </td>
+                {educationKeys.map(edu => {
+                  const stats = educationMetricData.teachers_active?.[edu] || {}
+                  return (
+                    <td key={edu} style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>
+                      <strong>{stats.mean || 0}h</strong>
+                      <div style={{ fontSize: '0.8rem' }}>({stats.count || 0} risp.)</div>
+                    </td>
+                  )
+                })}
+              </tr>
+              <tr>
+                <td style={{ padding: '12px', color: '#334155', fontWeight: '500' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: COLORS.teachers_training }}></div>
+                    Non in Servizio
+                  </div>
+                </td>
+                {educationKeys.map(edu => {
+                  const stats = educationMetricData.teachers_training?.[edu] || {}
+                  return (
+                    <td key={edu} style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>
+                      <strong>{stats.mean || 0}h</strong>
+                      <div style={{ fontSize: '0.8rem' }}>({stats.count || 0} risp.)</div>
+                    </td>
+                  )
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {educationViewMode === 'by-group' ? (
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={educationChartDataByGroup}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="education" tick={{ fill: '#64748b' }} />
+              <YAxis
+                label={{ value: 'Ore settimanali', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                tick={{ fill: '#64748b' }}
+              />
+              <Tooltip
+                contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                formatter={(value, name) => {
+                  if (name === 'Studenti') return [`${value}h`, 'Studenti']
+                  if (name === 'Docenti in Servizio') return [`${value}h`, 'Docenti in Servizio']
+                  if (name === 'Non in Servizio') return [`${value}h`, 'Non in Servizio']
+                  return [value, name]
+                }}
+              />
+              <Legend />
+              <Bar name="Studenti" dataKey="studenti" fill={COLORS.students} />
+              <Bar name="Docenti in Servizio" dataKey="docenti_attivi" fill={COLORS.teachers_active} />
+              <Bar name="Non in Servizio" dataKey="non_servizio" fill={COLORS.teachers_training} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+            {educationKeys.map(edu => {
+              const chartData = groupsData.map(group => ({
+                group: group.label,
+                hours: educationMetricData[group.key]?.[edu]?.mean || 0,
+                count: educationMetricData[group.key]?.[edu]?.count || 0,
+                color: group.color
+              }))
+
+              return (
+                <div key={edu} style={{
+                  backgroundColor: 'white',
+                  padding: '15px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                  <h5 style={{ margin: '0 0 15px 0', color: '#334155', fontSize: '1rem', textAlign: 'center' }}>{edu}</h5>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="group" tick={{ fill: '#64748b', fontSize: 11 }} angle={-15} textAnchor="end" height={60} />
+                      <YAxis
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                        label={{ value: 'Ore/sett', angle: -90, position: 'insideLeft', style: { fontSize: 11 } }}
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.85rem' }}
+                        formatter={(value, name, props) => [`${value}h (n=${props.payload.count})`, props.payload.group]}
+                      />
+                      <Bar dataKey="hours" fill="#8884d8">
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div style={{
+          marginTop: '20px',
+          padding: '12px',
+          backgroundColor: '#f0f9ff',
+          borderRadius: '8px',
+          border: '1px solid #bae6fd'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+            <Icons.Info className="w-4 h-4" style={{ color: '#0369a1', flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ fontSize: '0.85rem', color: '#0c4a6e', lineHeight: '1.4' }}>
+              <strong>Nota metodologica:</strong> I dati mostrano medie e dispersioni calcolate sui soli rispondenti che hanno dichiarato ore dedicate al contesto selezionato. I valori possono variare sensibilmente al variare del campione disponibile per ciascun segmento.
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderSchoolAnalysis = () => {
+    const schoolMetricData = factorsData.school?.[factorMetric] || {}
+    const schoolKeys = Array.from(new Set([
+      ...Object.keys(schoolMetricData.students || {}),
+      ...Object.keys(schoolMetricData.teachers_active || {}),
+      ...Object.keys(schoolMetricData.teachers_training || {})
+    ]))
+
+    if (schoolKeys.length === 0) {
+      return (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+          <Icons.Building className="w-12 h-12" style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+          <p>Dati insufficienti per analizzare le differenze per scuola/istituto</p>
+        </div>
+      )
+    }
+
+    const schoolChartData = schoolKeys.map(school => ({
+      school: school,
+      studenti: schoolMetricData.students?.[school]?.mean || 0,
+      studenti_count: schoolMetricData.students?.[school]?.count || 0,
+      docenti_attivi: schoolMetricData.teachers_active?.[school]?.mean || 0,
+      docenti_attivi_count: schoolMetricData.teachers_active?.[school]?.count || 0,
+      non_servizio: schoolMetricData.teachers_training?.[school]?.mean || 0,
+      non_servizio_count: schoolMetricData.teachers_training?.[school]?.count || 0
+    }))
+
+    return (
+      <div>
+        <div style={{ marginBottom: '20px' }}>
+          <h4 style={{ color: '#334155', marginBottom: '10px', fontSize: '1.1rem' }}>Scuola/Istituto - {metricLabel}</h4>
+          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+            Ore medie settimanali per tipo di scuola/istituto tra chi utilizza l'IA in questo contesto.
+          </p>
+        </div>
+
+        {/* Toggle per cambiare modalità di visualizzazione */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '12px',
+          marginBottom: '24px',
+          padding: '8px',
+          backgroundColor: '#f8fafc',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <button
+            onClick={() => setSchoolViewMode('by-group')}
+            style={{
+              flex: 1,
+              maxWidth: '250px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: schoolViewMode === 'by-group' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
+              backgroundColor: schoolViewMode === 'by-group' ? '#dbeafe' : 'white',
+              color: schoolViewMode === 'by-group' ? '#1e40af' : '#64748b',
+              cursor: 'pointer',
+              fontWeight: schoolViewMode === 'by-group' ? '600' : '400',
+              transition: 'all 0.2s'
+            }}
+          >
+            Confronta per gruppo
+          </button>
+          <button
+            onClick={() => setSchoolViewMode('by-school')}
+            style={{
+              flex: 1,
+              maxWidth: '250px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: schoolViewMode === 'by-school' ? '2px solid #3b82f6' : '1px solid #cbd5e1',
+              backgroundColor: schoolViewMode === 'by-school' ? '#dbeafe' : 'white',
+              color: schoolViewMode === 'by-school' ? '#1e40af' : '#64748b',
+              cursor: 'pointer',
+              fontWeight: schoolViewMode === 'by-school' ? '600' : '400',
+              transition: 'all 0.2s'
+            }}
+          >
+            Confronta per scuola
+          </button>
+        </div>
+
+        <div style={{ marginBottom: '30px', overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                <th style={{ padding: '12px', textAlign: 'left', color: '#334155', fontWeight: '600' }}>Gruppo</th>
+                {schoolKeys.map(school => (
+                  <th key={school} style={{ padding: '12px', textAlign: 'center', color: '#334155', fontWeight: '600' }}>
+                    {school}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <td style={{ padding: '12px', color: '#334155', fontWeight: '500' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: COLORS.students }}></div>
+                    Studenti
+                  </div>
+                </td>
+                {schoolKeys.map(school => {
+                  const stats = schoolMetricData.students?.[school] || {}
+                  return (
+                    <td key={school} style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>
+                      <strong>{stats.mean || 0}h</strong>
+                      <div style={{ fontSize: '0.8rem' }}>({stats.count || 0} risp.)</div>
+                    </td>
+                  )
+                })}
+              </tr>
+              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <td style={{ padding: '12px', color: '#334155', fontWeight: '500' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: COLORS.teachers_active }}></div>
+                    Docenti in Servizio
+                  </div>
+                </td>
+                {schoolKeys.map(school => {
+                  const stats = schoolMetricData.teachers_active?.[school] || {}
+                  return (
+                    <td key={school} style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>
+                      <strong>{stats.mean || 0}h</strong>
+                      <div style={{ fontSize: '0.8rem' }}>({stats.count || 0} risp.)</div>
+                    </td>
+                  )
+                })}
+              </tr>
+              <tr>
+                <td style={{ padding: '12px', color: '#334155', fontWeight: '500' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: COLORS.teachers_training }}></div>
+                    Non in Servizio
+                  </div>
+                </td>
+                {schoolKeys.map(school => {
+                  const stats = schoolMetricData.teachers_training?.[school] || {}
+                  return (
+                    <td key={school} style={{ padding: '12px', textAlign: 'center', color: '#64748b' }}>
+                      <strong>{stats.mean || 0}h</strong>
+                      <div style={{ fontSize: '0.8rem' }}>({stats.count || 0} risp.)</div>
+                    </td>
+                  )
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {schoolViewMode === 'by-group' ? (
+          // Modalità "Confronta per gruppo": un solo grafico con scuole sull'asse X
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={schoolChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="school" tick={{ fill: '#64748b' }} />
+              <YAxis
+                label={{ value: 'Ore settimanali', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                tick={{ fill: '#64748b' }}
+              />
+              <Tooltip
+                contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                formatter={(value, name) => {
+                  if (name === 'Studenti') return [`${value}h`, 'Studenti']
+                  if (name === 'Docenti in Servizio') return [`${value}h`, 'Docenti in Servizio']
+                  if (name === 'Non in Servizio') return [`${value}h`, 'Non in Servizio']
+                  return [value, name]
+                }}
+              />
+              <Legend />
+              <Bar name="Studenti" dataKey="studenti" fill={COLORS.students} />
+              <Bar name="Docenti in Servizio" dataKey="docenti_attivi" fill={COLORS.teachers_active} />
+              <Bar name="Non in Servizio" dataKey="non_servizio" fill={COLORS.teachers_training} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          // Modalità "Confronta per scuola": un grafico per ogni scuola
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '24px',
+            marginTop: '20px'
+          }}>
+            {schoolKeys.map(school => {
+              const schoolSpecificData = [{
+                category: 'Studenti',
+                value: schoolMetricData.students?.[school]?.mean || 0,
+                count: schoolMetricData.students?.[school]?.count || 0,
+                color: COLORS.students
+              }, {
+                category: 'Docenti in Servizio',
+                value: schoolMetricData.teachers_active?.[school]?.mean || 0,
+                count: schoolMetricData.teachers_active?.[school]?.count || 0,
+                color: COLORS.teachers_active
+              }, {
+                category: 'Non in Servizio',
+                value: schoolMetricData.teachers_training?.[school]?.mean || 0,
+                count: schoolMetricData.teachers_training?.[school]?.count || 0,
+                color: COLORS.teachers_training
+              }]
+
+              return (
+                <div key={school} style={{
+                  backgroundColor: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                  <h5 style={{
+                    textAlign: 'center',
+                    color: '#334155',
+                    marginBottom: '16px',
+                    fontSize: '1rem',
+                    fontWeight: '600'
+                  }}>
+                    {school}
+                  </h5>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={schoolSpecificData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis
+                        dataKey="category"
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                        angle={-15}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis
+                        label={{ value: 'Ore', angle: -90, position: 'insideLeft', fill: '#64748b', fontSize: 12 }}
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                        formatter={(value, name, entry) => [`${value}h (n=${entry.payload.count})`, entry.payload.category]}
+                      />
+                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                        {schoolSpecificData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div style={{
+          marginTop: '20px',
+          padding: '12px',
+          backgroundColor: '#f0f9ff',
+          borderRadius: '8px',
+          border: '1px solid #bae6fd'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+            <Icons.Info className="w-4 h-4" style={{ color: '#0369a1', flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ fontSize: '0.85rem', color: '#0c4a6e', lineHeight: '1.4' }}>
+              <strong>Nota metodologica:</strong> I dati mostrano medie e dispersioni calcolate sui soli rispondenti che hanno dichiarato ore dedicate al contesto selezionato. I valori possono variare sensibilmente al variare del campione disponibile per ciascun segmento.
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -2436,22 +3294,8 @@ function renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMet
         {factorTab === 'age' && renderAgeAnalysis()}
         {factorTab === 'gender' && renderGenderAnalysis()}
         {factorTab === 'stem' && renderStemAnalysis()}
-      </section>
-
-      <section style={{
-        backgroundColor: '#f0f9ff',
-        padding: '20px',
-        borderRadius: '8px',
-        border: '1px solid #bae6fd'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-          <Icons.Info className="w-5 h-5" style={{ color: '#0369a1', marginTop: '2px', flexShrink: 0 }} />
-          <div style={{ fontSize: '0.9rem', color: '#0c4a6e', lineHeight: '1.6' }}>
-            <strong>Nota metodologica:</strong> i dati mostrano medie e dispersioni calcolate sui soli rispondenti che hanno
-            dichiarato ore dedicate al contesto selezionato. I valori possono variare sensibilmente al variare del campione
-            disponibile per ciascun segmento.
-          </div>
-        </div>
+        {factorTab === 'education' && renderEducationAnalysis()}
+        {factorTab === 'school' && renderSchoolAnalysis()}
       </section>
     </div>
   )
@@ -2487,8 +3331,8 @@ function renderInfluenceFactors(data, influenceUsage, setInfluenceUsage, influen
 
   const groupMeta = [
     { key: 'students', label: 'Studenti', color: COLORS.students },
-    { key: 'teachers_active', label: 'Docenti Attivi', color: COLORS.teachers_active },
-    { key: 'teachers_training', label: 'Docenti in Formazione', color: COLORS.teachers_training }
+    { key: 'teachers_active', label: 'Docenti in Servizio', color: COLORS.teachers_active },
+    { key: 'teachers_training', label: 'Docenti Non in Servizio', color: COLORS.teachers_training }
   ]
 
   const chartData = groupMeta.map(group => {

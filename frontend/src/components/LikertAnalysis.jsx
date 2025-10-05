@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, ComposedChart, Line, Scatter } from 'recharts'
 import { Icons } from './Icons'
+import LikertInterpretation from './LikertInterpretation'
 import './Dashboard.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
@@ -23,8 +24,8 @@ const RESPONDENT_COLORS = {
 
 const RESPONDENT_LABELS = {
   students: 'Studenti',
-  teachers_active: 'Insegnanti Attivi',
-  teachers_training: 'Insegnanti in Formazione'
+  teachers_active: 'Insegnanti in servizio',
+  teachers_training: 'Insegnanti in formazione'
 }
 
 function LikertAnalysis() {
@@ -32,6 +33,7 @@ function LikertAnalysis() {
   const [loading, setLoading] = useState(true)
   const [selectedGroup, setSelectedGroup] = useState('all')
   const [expandedQuestions, setExpandedQuestions] = useState(new Set())
+  const [activeTab, setActiveTab] = useState('grafici')
 
   useEffect(() => {
     loadLikertData()
@@ -114,7 +116,7 @@ function LikertAnalysis() {
         <div>
           <h2>
             <Icons.Stats className="w-6 h-6" />
-            Analisi Domande Likert (Scala 1-7)
+            Analisi domande Likert (scala 1-7)
           </h2>
           <p className="section-subtitle">
             Tutte le domande con scala Likert 1-7 suddivise per gruppo di rispondenti
@@ -122,19 +124,66 @@ function LikertAnalysis() {
         </div>
       </header>
 
-      <div className="filters-section">
+      {/* Tab Navigation */}
+      <div style={{
+        marginBottom: '2rem',
+        borderBottom: '2px solid #e2e8f0',
+        display: 'flex',
+        gap: '0.5rem',
+        padding: '0 2rem',
+        background: '#ffffff'
+      }}>
+        {[
+          { key: 'grafici', label: 'Grafici', icon: Icons.Chart },
+          { key: 'interpretazione', label: 'Interpretazione', icon: Icons.FileText }
+        ].map(tab => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: '12px 20px',
+                backgroundColor: activeTab === tab.key ? '#8b5cf6' : 'transparent',
+                color: activeTab === tab.key ? 'white' : '#64748b',
+                border: 'none',
+                borderBottom: activeTab === tab.key ? '2px solid #8b5cf6' : '2px solid transparent',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                fontWeight: activeTab === tab.key ? '600' : '500',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                borderRadius: '8px 8px 0 0'
+              }}
+            >
+              <Icon className="w-5 h-5" />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Content based on active tab */}
+      {activeTab === 'interpretazione' ? (
+        <LikertInterpretation />
+      ) : (
+        <div>
+
+      <div className="filters-section" style={{ marginBottom: '2rem' }}>
         <div className="filter-group">
           <label>Visualizza:</label>
           <select value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
             <option value="all">Tutti i gruppi</option>
-            <option value="students">Solo Studenti</option>
-            <option value="teachers_active">Solo Insegnanti Attivi</option>
-            <option value="teachers_training">Solo Insegnanti in Formazione</option>
+            <option value="students">Solo studenti</option>
+            <option value="teachers_active">Solo insegnanti in servizio</option>
+            <option value="teachers_training">Solo insegnanti non in servizio</option>
           </select>
         </div>
       </div>
 
-      <div className="stats-summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+      <div className="stats-summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '3rem' }}>
         <div className="stat-card" style={{ backgroundColor: '#dbeafe', padding: '1rem', borderRadius: '8px' }}>
           <div style={{ fontSize: '0.85rem', color: '#1e40af', marginBottom: '0.25rem' }}>Studenti</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1e40af' }}>
@@ -143,14 +192,14 @@ function LikertAnalysis() {
           <div style={{ fontSize: '0.8rem', color: '#60a5fa' }}>domande Likert</div>
         </div>
         <div className="stat-card" style={{ backgroundColor: '#d1fae5', padding: '1rem', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.85rem', color: '#065f46', marginBottom: '0.25rem' }}>Insegnanti Attivi</div>
+          <div style={{ fontSize: '0.85rem', color: '#065f46', marginBottom: '0.25rem' }}>Insegnanti in servizio</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#065f46' }}>
             {likertData.statistics.teachers_active_questions}
           </div>
           <div style={{ fontSize: '0.8rem', color: '#34d399' }}>domande Likert</div>
         </div>
         <div className="stat-card" style={{ backgroundColor: '#fef3c7', padding: '1rem', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.85rem', color: '#92400e', marginBottom: '0.25rem' }}>In Formazione</div>
+          <div style={{ fontSize: '0.85rem', color: '#92400e', marginBottom: '0.25rem' }}>In formazione</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#92400e' }}>
             {likertData.statistics.teachers_training_questions}
           </div>
@@ -170,7 +219,7 @@ function LikertAnalysis() {
         <section className="likert-section">
           <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Icons.Users className="w-5 h-5" />
-            Domande Corrispondenti tra Gruppi
+            Domande corrispondenti tra gruppi
           </h3>
           <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1.5rem' }}>
             Domande poste sia a studenti che a insegnanti (attivi e in formazione)
@@ -187,11 +236,21 @@ function LikertAnalysis() {
 
             return (
               <div key={qId} className="likert-question-card shared" style={{ marginBottom: '2rem', border: '2px solid #8b5cf6', borderRadius: '8px', overflow: 'hidden' }}>
-                <div style={{ padding: '1rem', backgroundColor: '#f5f3ff', cursor: 'pointer' }} onClick={() => toggleQuestion(qId)}>
+                <div
+                  style={{
+                    padding: '1rem',
+                    backgroundColor: '#f5f3ff',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onClick={() => toggleQuestion(qId)}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#ede9fe'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f3ff'}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '0.85rem', color: '#6d28d9', marginBottom: '0.5rem', fontWeight: '600' }}>
-                        DOMANDA CORRISPONDENTE
+                        DOMANDA CORRISPONDENTE {isExpanded ? '(Clicca per nascondere dettagli)' : '(Clicca per mostrare grafici dettagliati)'}
                       </div>
                       <div style={{ fontSize: '1rem', fontWeight: '500', color: '#1e293b' }}>
                         {group.question_text}
@@ -200,7 +259,15 @@ function LikertAnalysis() {
                         Campo: {group.column_name}
                       </div>
                     </div>
-                    <Icons.ChevronDown className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} style={{ color: '#8b5cf6', marginLeft: '1rem' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+                      <Icons.ChevronDown
+                        className={`w-6 h-6 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        style={{ color: '#8b5cf6' }}
+                      />
+                      <span style={{ fontSize: '0.7rem', color: '#8b5cf6', fontWeight: '600' }}>
+                        {isExpanded ? 'Nascondi' : 'Mostra'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -215,10 +282,10 @@ function LikertAnalysis() {
                   {/* Dettagli espandibili */}
                   {isExpanded && (
                     <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid #e2e8f0' }}>
-                      <h4 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: '#475569' }}>Grafici Dettagliati</h4>
+                      <h4 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: '#475569' }}>Grafici dettagliati</h4>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem' }}>
                         {studentQ && <DetailedQuestionView question={studentQ} label="Studenti" />}
-                        {teacherActiveQ && <DetailedQuestionView question={teacherActiveQ} label="Insegnanti Attivi" />}
+                        {teacherActiveQ && <DetailedQuestionView question={teacherActiveQ} label="Insegnanti in Servizio" />}
                         {teacherTrainingQ && <DetailedQuestionView question={teacherTrainingQ} label="Insegnanti in Formazione" />}
                       </div>
                     </div>
@@ -235,7 +302,7 @@ function LikertAnalysis() {
         <section className="likert-section">
           <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: '#7c3aed', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Icons.Teacher className="w-5 h-5" />
-            Domande Specifiche Insegnanti: Confronto Attivi vs In Formazione
+            Domande specifiche insegnanti: confronto attivi vs in formazione
           </h3>
           <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1.5rem' }}>
             Domande poste solo agli insegnanti, confrontate tra chi insegna attualmente e chi è in formazione
@@ -244,18 +311,43 @@ function LikertAnalysis() {
           {Object.entries(teacherSpecificQuestions).map(([key, group]) => {
             const activeQ = group.questions.find(q => q.respondent_type === 'teachers_active')
             const trainingQ = group.questions.find(q => q.respondent_type === 'teachers_training')
+            const qId = `teacher-specific-${key}`
+            const isExpanded = expandedQuestions.has(qId)
 
             return (
               <div key={`teacher-${key}`} className="likert-question-card" style={{ marginBottom: '2rem', border: '2px solid #7c3aed', borderRadius: '8px', overflow: 'hidden' }}>
-                <div style={{ padding: '1rem', backgroundColor: '#f5f3ff' }}>
-                  <div style={{ fontSize: '0.85rem', color: '#6d28d9', marginBottom: '0.5rem', fontWeight: '600' }}>
-                    DOMANDA SPECIFICA INSEGNANTI
-                  </div>
-                  <div style={{ fontSize: '1rem', fontWeight: '500', color: '#1e293b' }}>
-                    {group.question_text}
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.5rem' }}>
-                    Campo: {group.column_name}
+                <div
+                  style={{
+                    padding: '1rem',
+                    backgroundColor: '#f5f3ff',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onClick={() => toggleQuestion(qId)}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#ede9fe'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f3ff'}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.85rem', color: '#6d28d9', marginBottom: '0.5rem', fontWeight: '600' }}>
+                        DOMANDA SPECIFICA INSEGNANTI {isExpanded ? '(Clicca per nascondere dettagli)' : '(Clicca per mostrare grafici dettagliati)'}
+                      </div>
+                      <div style={{ fontSize: '1rem', fontWeight: '500', color: '#1e293b' }}>
+                        {group.question_text}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.5rem' }}>
+                        Campo: {group.column_name}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+                      <Icons.ChevronDown
+                        className={`w-6 h-6 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        style={{ color: '#7c3aed' }}
+                      />
+                      <span style={{ fontSize: '0.7rem', color: '#7c3aed', fontWeight: '600' }}>
+                        {isExpanded ? 'Nascondi' : 'Mostra'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -264,6 +356,17 @@ function LikertAnalysis() {
                     activeData={activeQ}
                     trainingData={trainingQ}
                   />
+
+                  {/* Grafici dettagliati espandibili */}
+                  {isExpanded && (
+                    <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid #e2e8f0' }}>
+                      <h4 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: '#475569' }}>Grafici dettagliati</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem' }}>
+                        {activeQ && <DetailedQuestionView question={activeQ} label="Insegnanti in Servizio" />}
+                        {trainingQ && <DetailedQuestionView question={trainingQ} label="Insegnanti in Formazione" />}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -279,6 +382,9 @@ function LikertAnalysis() {
           return null
         }
 
+        const qId = 'students-specific-all'
+        const isExpanded = expandedQuestions.has(qId)
+
         return (
           <section key="students-specific" className="likert-section">
             <h3 style={{
@@ -290,51 +396,74 @@ function LikertAnalysis() {
               gap: '0.5rem'
             }}>
               <Icons.Student className="w-5 h-5" />
-              Domande Specifiche: Studenti
+              Domande specifiche: studenti
             </h3>
             <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1.5rem' }}>
               Domande poste solo agli studenti
             </p>
 
-            {/* Box plots affiancati per tutte le domande */}
-            {studentQuestions.length > 0 && (
-              <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#ffffff', border: `2px solid ${RESPONDENT_COLORS.students}`, borderRadius: '8px' }}>
-                <h4 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: '#475569', textAlign: 'center' }}>
-                  Confronto Box Plot - Tutte le Domande Specifiche Studenti
-                </h4>
-                <MultipleStudentBoxPlots questions={studentQuestions} />
-              </div>
-            )}
-
-            {/* Sezione espandibile per grafici dettagliati */}
-            <details style={{ marginTop: '2rem' }}>
-              <summary style={{
-                cursor: 'pointer',
-                padding: '1rem',
-                backgroundColor: RESPONDENT_COLORS.students + '15',
-                borderRadius: '8px',
-                fontWeight: '600',
-                color: RESPONDENT_COLORS.students,
-                marginBottom: '1rem'
-              }}>
-                Mostra grafici di distribuzione dettagliati
-              </summary>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem', marginTop: '1rem' }}>
-                {studentQuestions.map((q, idx) => (
-                  <div key={`detail-students-${idx}`} style={{
-                    padding: '1.5rem',
-                    backgroundColor: '#ffffff',
-                    border: `1px solid ${RESPONDENT_COLORS.students}40`,
-                    borderRadius: '8px'
-                  }}>
-                    <h4 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '1rem', color: '#1e293b' }}>
-                      {q.question_text}
-                    </h4>
-                    <DetailedQuestionView question={q} label="Studenti" />
+            {/* Card con box plots e grafici espandibili */}
+            <div style={{ marginBottom: '2rem', border: `2px solid ${RESPONDENT_COLORS.students}`, borderRadius: '8px', overflow: 'hidden' }}>
+              {/* Header cliccabile */}
+              <div
+                style={{
+                  padding: '1rem',
+                  backgroundColor: RESPONDENT_COLORS.students + '15',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onClick={() => toggleQuestion(qId)}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = RESPONDENT_COLORS.students + '25'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = RESPONDENT_COLORS.students + '15'}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.85rem', color: RESPONDENT_COLORS.students, marginBottom: '0.5rem', fontWeight: '600' }}>
+                      DOMANDE SPECIFICHE STUDENTI {isExpanded ? '(Clicca per nascondere dettagli)' : '(Clicca per mostrare grafici dettagliati)'}
+                    </div>
+                    <div style={{ fontSize: '1rem', fontWeight: '500', color: '#1e293b' }}>
+                      Confronto box plot - tutte le domande specifiche studenti
+                    </div>
                   </div>
-                ))}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
+                    <Icons.ChevronDown
+                      className={`w-6 h-6 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      style={{ color: RESPONDENT_COLORS.students }}
+                    />
+                    <span style={{ fontSize: '0.7rem', color: RESPONDENT_COLORS.students, fontWeight: '600' }}>
+                      {isExpanded ? 'Nascondi' : 'Mostra'}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </details>
+
+              {/* Box plots sempre visibili */}
+              <div style={{ padding: '1.5rem', backgroundColor: '#ffffff' }}>
+                <MultipleStudentBoxPlots questions={studentQuestions} />
+
+                {/* Grafici dettagliati espandibili */}
+                {isExpanded && (
+                  <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid #e2e8f0' }}>
+                    <h4 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: '#475569' }}>Grafici Dettagliati</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+                      {studentQuestions.map((q, idx) => (
+                        <div key={`detail-students-${idx}`} style={{
+                          padding: '1.5rem',
+                          backgroundColor: '#ffffff',
+                          border: `1px solid ${RESPONDENT_COLORS.students}40`,
+                          borderRadius: '8px'
+                        }}>
+                          <h4 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '1rem', color: '#1e293b' }}>
+                            {q.question_text}
+                          </h4>
+                          <DetailedQuestionView question={q} label="Studenti" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </section>
         )
       })()}
@@ -362,7 +491,7 @@ function LikertAnalysis() {
               gap: '0.5rem'
             }}>
               <GroupIcon className="w-5 h-5" />
-              Domande Specifiche: {RESPONDENT_LABELS[selectedGroup]}
+              Domande specifiche: {RESPONDENT_LABELS[selectedGroup]}
             </h3>
 
             <div style={{ marginBottom: '2rem' }}>
@@ -378,77 +507,136 @@ function LikertAnalysis() {
           </section>
         )
       })()}
+        </div>
+      )}
     </div>
   )
 }
 
 // Componente Box Plot multipli per domande studenti (tutti affiancati)
 function MultipleStudentBoxPlots({ questions }) {
-  const color = RESPONDENT_COLORS.students
+  const baseColor = RESPONDENT_COLORS.students
 
   if (!questions || questions.length === 0) return null
 
-  // Calcola dimensioni dinamiche
+  // Genera tonalità diverse di blu per ogni box plot
+  const generateBlueShades = (count) => {
+    // Colore base studenti: #3b82f6 (blu)
+    // Genero variazioni dal blu scuro (#1e40af) al blu chiaro (#93c5fd)
+    const blueShades = [
+      '#1e40af', // Blu molto scuro
+      '#2563eb', // Blu scuro
+      '#3b82f6', // Blu base (colore studenti)
+      '#60a5fa', // Blu medio-chiaro
+      '#93c5fd', // Blu chiaro
+      '#bfdbfe', // Blu molto chiaro
+      '#dbeafe', // Blu chiarissimo
+      '#eff6ff'  // Blu quasi bianco
+    ]
+
+    // Seleziona le tonalità in base al numero di domande
+    const result = []
+    for (let i = 0; i < count; i++) {
+      const index = Math.floor((i / count) * blueShades.length)
+      result.push(blueShades[Math.min(index, blueShades.length - 1)])
+    }
+    return result
+  }
+
+  const colors = generateBlueShades(questions.length)
+
+  // Calcola dimensioni dinamiche - più larghe
   const numQuestions = questions.length
-  const boxWidth = 60
-  const spacing = 120
-  const totalWidth = Math.max(900, numQuestions * spacing + 160)
-  const height = 500
+  const boxWidth = 70
+  const spacing = 140
+  const paddingLeft = 100
+  const paddingRight = 60
+  const totalWidth = Math.max(1200, numQuestions * spacing + paddingLeft + paddingRight)
+  const height = 450
 
   return (
-    <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
-      <svg width={totalWidth} height={height} viewBox={`0 0 ${totalWidth} ${height}`}>
+    <div style={{ marginBottom: '1.5rem' }}>
+      {/* Leggenda compatta sopra il grafico */}
+      <div style={{
+        marginBottom: '1rem',
+        padding: '1rem',
+        backgroundColor: '#f8fafc',
+        borderRadius: '8px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+        justifyContent: 'center',
+        alignItems: 'flex-start'
+      }}>
+        {questions.map((q, idx) => (
+          <div key={`legend-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              backgroundColor: colors[idx],
+              border: `2px solid ${colors[idx]}`,
+              borderRadius: '4px',
+              flexShrink: 0
+            }} />
+            <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: '500', wordWrap: 'break-word', flex: 1 }}>
+              Q{idx + 1}: {q.question_text}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Grafico centrato */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', overflowX: 'auto' }}>
+        <svg width={totalWidth} height={height} viewBox={`0 0 ${totalWidth} ${height}`} style={{ display: 'block', margin: '0 auto' }}>
         {/* Griglia e assi */}
         <g>
           {/* Asse Y con etichette */}
-          <line x1="80" y1="30" x2="80" y2="420" stroke="#cbd5e1" strokeWidth="2" />
+          <line x1="80" y1="30" x2="80" y2="400" stroke="#cbd5e1" strokeWidth="2" />
           {[0, 1, 2, 3, 4, 5, 6, 7].map((val) => {
-            const y = 420 - ((val / 7) * 390)
+            const y = 400 - ((val / 7) * 370)
             return (
               <g key={val}>
                 <line x1="75" y1={y} x2="80" y2={y} stroke="#cbd5e1" strokeWidth="1" />
-                <line x1="80" y1={y} x2={totalWidth - 40} y2={y} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="3 3" />
+                <line x1="80" y1={y} x2={totalWidth - paddingRight} y2={y} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="3 3" />
                 <text x="65" y={y + 5} fontSize="13" fill="#64748b" textAnchor="end">{val}</text>
               </g>
             )
           })}
-          <text x="20" y="225" fontSize="14" fill="#475569" transform="rotate(-90 20 225)" textAnchor="middle">
+          <text x="20" y="215" fontSize="14" fill="#475569" transform="rotate(-90 20 215)" textAnchor="middle">
             Scala Likert (1-7)
           </text>
 
           {/* Asse X */}
-          <line x1="80" y1="420" x2={totalWidth - 40} y2="420" stroke="#cbd5e1" strokeWidth="2" />
+          <line x1="80" y1="400" x2={totalWidth - paddingRight} y2="400" stroke="#cbd5e1" strokeWidth="2" />
 
-          {/* Box Plots */}
+          {/* Box Plots con colori diversi - centrati nella griglia */}
           {questions.map((question, index) => {
             const stats = question.stats
-            const xCenter = 110 + (index * spacing)
+            // Centra i box plots nella griglia disponibile
+            const totalGridWidth = totalWidth - paddingLeft - paddingRight
+            const startX = paddingLeft + (totalGridWidth - (numQuestions * spacing)) / 2
+            const xCenter = startX + (index * spacing) + spacing / 2
+            const color = colors[index]
 
-            const yMin = 420 - ((stats.quartiles.min / 7) * 390)
-            const yQ1 = 420 - ((stats.quartiles.q1 / 7) * 390)
-            const yQ2 = 420 - ((stats.quartiles.q2 / 7) * 390)
-            const yQ3 = 420 - ((stats.quartiles.q3 / 7) * 390)
-            const yMax = 420 - ((stats.quartiles.max / 7) * 390)
-            const yMean = 420 - ((stats.mean / 7) * 390)
-
-            // Abbrevia il testo della domanda per la label
-            const shortLabel = question.question_text.length > 20
-              ? question.question_text.substring(0, 18) + '...'
-              : question.question_text
+            const yMin = 400 - ((stats.quartiles.min / 7) * 370)
+            const yQ1 = 400 - ((stats.quartiles.q1 / 7) * 370)
+            const yQ2 = 400 - ((stats.quartiles.q2 / 7) * 370)
+            const yQ3 = 400 - ((stats.quartiles.q3 / 7) * 370)
+            const yMax = 400 - ((stats.quartiles.max / 7) * 370)
+            const yMean = 400 - ((stats.mean / 7) * 370)
 
             return (
               <g key={`box-${index}`}>
-                {/* Etichetta X con testo ruotato */}
+                {/* Etichetta numerica semplice sotto */}
                 <text
                   x={xCenter}
-                  y="435"
-                  fontSize="11"
-                  fill="#475569"
-                  textAnchor="end"
-                  transform={`rotate(-45 ${xCenter} 435)`}
-                  fontWeight="500"
+                  y="420"
+                  fontSize="14"
+                  fill={color}
+                  textAnchor="middle"
+                  fontWeight="700"
                 >
-                  {shortLabel}
+                  Q{index + 1}
                 </text>
 
                 {/* Whisker inferiore */}
@@ -463,23 +651,24 @@ function MultipleStudentBoxPlots({ questions }) {
                   y={yQ3}
                   width={boxWidth}
                   height={yQ1 - yQ3}
-                  fill={color + '35'}
+                  fill={color + '40'}
                   stroke={color}
                   strokeWidth="2.5"
                 />
 
-                {/* Mediana */}
+                {/* Mediana (linea tratteggiata spessa) */}
                 <line
                   x1={xCenter - boxWidth/2}
                   y1={yQ2}
                   x2={xCenter + boxWidth/2}
                   y2={yQ2}
                   stroke={color}
-                  strokeWidth="4"
+                  strokeWidth="5"
+                  strokeDasharray="8 4"
                 />
 
-                {/* Media (punto rosso) */}
-                <circle cx={xCenter} cy={yMean} r="5" fill="#ef4444" stroke="#fff" strokeWidth="2" />
+                {/* Media (punto) */}
+                <circle cx={xCenter} cy={yMean} r="6" fill="#ef4444" stroke="#fff" strokeWidth="2" />
 
                 {/* Cap min */}
                 <line
@@ -504,24 +693,25 @@ function MultipleStudentBoxPlots({ questions }) {
             )
           })}
         </g>
-      </svg>
+        </svg>
+      </div>
 
-      {/* Legenda con dettagli delle domande */}
+      {/* Dettagli statistici sotto il grafico */}
       <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
         {questions.map((q, idx) => (
-          <div key={`legend-${idx}`} style={{
+          <div key={`stats-${idx}`} style={{
             padding: '0.75rem',
-            backgroundColor: color + '10',
+            backgroundColor: colors[idx] + '15',
             borderRadius: '6px',
-            border: `1px solid ${color}40`
+            border: `2px solid ${colors[idx]}`
           }}>
             <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.5rem' }}>
-              {idx + 1}. {q.question_text}
+              Q{idx + 1}: {q.question_text}
             </div>
             <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.25rem' }}>
-              <div>Media: <strong style={{ color }}>{q.stats.mean}</strong></div>
-              <div>Mediana: <strong style={{ color }}>{q.stats.median}</strong></div>
-              <div>n: <strong style={{ color }}>{q.stats.total_responses}</strong></div>
+              <div>Media: <strong style={{ color: colors[idx] }}>{q.stats.mean}</strong></div>
+              <div>Mediana: <strong style={{ color: colors[idx] }}>{q.stats.median}</strong></div>
+              <div>n: <strong style={{ color: colors[idx] }}>{q.stats.total_responses}</strong></div>
             </div>
           </div>
         ))}
@@ -536,7 +726,7 @@ function TeacherComparisonBoxPlot({ activeData, trainingData }) {
 
   if (activeData) {
     boxPlotData.push({
-      name: 'Insegnanti Attivi',
+      name: 'Insegnanti in Servizio',
       type: 'teachers_active',
       ...activeData.stats.quartiles,
       mean: activeData.stats.mean,
@@ -546,7 +736,7 @@ function TeacherComparisonBoxPlot({ activeData, trainingData }) {
 
   if (trainingData) {
     boxPlotData.push({
-      name: 'In Formazione',
+      name: 'In formazione',
       type: 'teachers_training',
       ...trainingData.stats.quartiles,
       mean: trainingData.stats.mean,
@@ -557,7 +747,7 @@ function TeacherComparisonBoxPlot({ activeData, trainingData }) {
   return (
     <div>
       <h4 style={{ fontSize: '1rem', marginBottom: '1rem', color: '#475569', textAlign: 'center' }}>
-        Confronto Box Plot: Insegnanti Attivi vs In Formazione
+        Confronto box plot: Insegnanti in Servizio vs Non in Servizio
       </h4>
       <div style={{ width: '100%', maxWidth: '700px', margin: '0 auto' }}>
         <svg width="100%" height="450" viewBox="0 0 700 450">
@@ -624,15 +814,20 @@ function TeacherComparisonBoxPlot({ activeData, trainingData }) {
                     strokeWidth="2.5"
                   />
 
-                  {/* Mediana */}
+                  {/* Mediana (linea tratteggiata spessa) */}
                   <line
                     x1={xCenter - boxWidth/2}
                     y1={yQ2}
                     x2={xCenter + boxWidth/2}
                     y2={yQ2}
                     stroke={color}
-                    strokeWidth="4"
+                    strokeWidth="5"
+                    strokeDasharray="8 4"
                   />
+
+                  {/* Etichette Q1 e Q3 sul box */}
+                  <text x={xCenter + boxWidth/2 + 8} y={yQ1 + 4} fontSize="11" fill={color} fontWeight="600">Q1</text>
+                  <text x={xCenter + boxWidth/2 + 8} y={yQ3 + 4} fontSize="11" fill={color} fontWeight="600">Q3</text>
 
                   {/* Media (punto rosso) */}
                   <circle cx={xCenter} cy={yMean} r="6" fill="#ef4444" stroke="#fff" strokeWidth="2" />
@@ -796,15 +991,20 @@ function SingleQuestionBoxPlot({ question, color, groupLabel }) {
                     strokeWidth="2.5"
                   />
 
-                  {/* Mediana */}
+                  {/* Mediana (linea tratteggiata spessa) */}
                   <line
                     x1={xCenter - boxWidth/2}
                     y1={yQ2}
                     x2={xCenter + boxWidth/2}
                     y2={yQ2}
                     stroke={color}
-                    strokeWidth="4"
+                    strokeWidth="5"
+                    strokeDasharray="8 4"
                   />
+
+                  {/* Etichette Q1 e Q3 sul box */}
+                  <text x={xCenter + boxWidth/2 + 8} y={yQ1 + 4} fontSize="10" fill={color} fontWeight="600">Q1</text>
+                  <text x={xCenter + boxWidth/2 + 8} y={yQ3 + 4} fontSize="10" fill={color} fontWeight="600">Q3</text>
 
                   {/* Media (punto rosso) */}
                   <circle cx={xCenter} cy={yMean} r="6" fill="#ef4444" stroke="#fff" strokeWidth="2" />
@@ -865,7 +1065,7 @@ function ComparisonBoxPlot({ studentData, teacherActiveData, teacherTrainingData
 
   if (teacherActiveData) {
     boxPlotData.push({
-      name: 'Insegnanti Attivi',
+      name: 'Insegnanti in Servizio',
       type: 'teachers_active',
       ...teacherActiveData.stats.quartiles,
       mean: teacherActiveData.stats.mean,
@@ -875,7 +1075,7 @@ function ComparisonBoxPlot({ studentData, teacherActiveData, teacherTrainingData
 
   if (teacherTrainingData) {
     boxPlotData.push({
-      name: 'In Formazione',
+      name: 'In formazione',
       type: 'teachers_training',
       ...teacherTrainingData.stats.quartiles,
       mean: teacherTrainingData.stats.mean,
@@ -886,7 +1086,7 @@ function ComparisonBoxPlot({ studentData, teacherActiveData, teacherTrainingData
   return (
     <div>
       <h4 style={{ fontSize: '1rem', marginBottom: '1rem', color: '#475569', textAlign: 'center' }}>
-        Confronto Box Plot
+        Confronto box plot
       </h4>
       <div style={{ width: '100%', maxWidth: '900px', margin: '0 auto', position: 'relative' }}>
         <svg width="100%" height="500" viewBox="0 0 900 500">
@@ -954,15 +1154,20 @@ function ComparisonBoxPlot({ studentData, teacherActiveData, teacherTrainingData
                     strokeWidth="2.5"
                   />
 
-                  {/* Mediana */}
+                  {/* Mediana (linea tratteggiata spessa) */}
                   <line
                     x1={xCenter - boxWidth/2}
                     y1={yQ2}
                     x2={xCenter + boxWidth/2}
                     y2={yQ2}
                     stroke={color}
-                    strokeWidth="4"
+                    strokeWidth="5"
+                    strokeDasharray="8 4"
                   />
+
+                  {/* Etichette Q1 e Q3 sul box */}
+                  <text x={xCenter + boxWidth/2 + 8} y={yQ1 + 4} fontSize="11" fill={color} fontWeight="600">Q1</text>
+                  <text x={xCenter + boxWidth/2 + 8} y={yQ3 + 4} fontSize="11" fill={color} fontWeight="600">Q3</text>
 
                   {/* Media (punto rosso) */}
                   <circle cx={xCenter} cy={yMean} r="6" fill="#ef4444" stroke="#fff" strokeWidth="2" />

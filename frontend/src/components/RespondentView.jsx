@@ -102,9 +102,9 @@ function RespondentView() {
       case 'student':
         return { label: 'Studente', color: '#3b82f6', icon: Icons.Student }
       case 'teacher_active':
-        return { label: 'Insegnante', color: '#10b981', icon: Icons.Teacher }
+        return { label: 'Insegnante in servizio', color: '#10b981', icon: Icons.Teacher }
       case 'teacher_training':
-        return { label: 'Insegnante in Formazione', color: '#f59e0b', icon: Icons.Teacher }
+        return { label: 'Insegnante in formazione', color: '#f59e0b', icon: Icons.Teacher }
       default:
         return { label: type, color: '#64748b', icon: Icons.Question }
     }
@@ -115,7 +115,7 @@ function RespondentView() {
       <div style={{ marginBottom: '30px' }}>
         <h2 style={{ color: '#1e40af', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icons.Student className="w-6 h-6" />
-          Visualizzazione Risposte Singolo Rispondente
+          Visualizzazione risposte singolo rispondente
         </h2>
         <p style={{ color: '#64748b', fontSize: '0.95em' }}>
           Cerca un rispondente tramite codice identificativo per visualizzare tutte le sue risposte
@@ -130,7 +130,7 @@ function RespondentView() {
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
         marginBottom: '25px'
       }}>
-        <h3 style={{ marginBottom: '15px', color: '#334155' }}>Ricerca Rispondente</h3>
+        <h3 style={{ marginBottom: '15px', color: '#334155' }}>Ricerca rispondente</h3>
         
         <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
           {/* Filtro tipo rispondente */}
@@ -153,9 +153,9 @@ function RespondentView() {
             >
               <option value="all">Tutti</option>
               <option value="student">Studenti</option>
-              <option value="teacher">Insegnanti Totali</option>
-              <option value="teacher_active">Insegnanti</option>
-              <option value="teacher_training">Insegnanti in Formazione</option>
+              <option value="teacher">Insegnanti totali</option>
+              <option value="teacher_active">Insegnanti in servizio</option>
+              <option value="teacher_training">Insegnanti in formazione</option>
             </select>
           </div>
 

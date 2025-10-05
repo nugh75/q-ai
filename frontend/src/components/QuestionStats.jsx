@@ -790,7 +790,7 @@ function QuestionStats({ question, teacherFilter }) {
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
           >
             <Icons.Image className="w-4 h-4" />
-            <span>Esporta Grafico</span>
+            <span>Esporta grafico</span>
           </button>
           <button
             onClick={handleExportTable}
@@ -814,7 +814,7 @@ function QuestionStats({ question, teacherFilter }) {
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
           >
             <Icons.Download className="w-4 h-4" />
-            <span>Esporta Dati</span>
+            <span>Esporta dati</span>
           </button>
         </div>
       </div>
@@ -835,7 +835,7 @@ function QuestionStats({ question, teacherFilter }) {
                 {type === 'pie' && 'Torta'}
                 {type === 'line' && 'Linea'}
                 {type === 'histogram' && 'Istogramma'}
-                {type === 'boxplot' && 'Box Plot'}
+                {type === 'boxplot' && 'box plot'}
               </button>
             ))}
           </div>
