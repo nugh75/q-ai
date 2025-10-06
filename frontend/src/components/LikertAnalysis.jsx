@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, ComposedChart, Line, Scatter } from 'recharts'
 import { Icons } from './Icons'
 import LikertInterpretation from './LikertInterpretation'
+import SegmentedLikertAnalysis from './SegmentedLikertAnalysis'
 import './Dashboard.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
@@ -19,13 +20,13 @@ const LIKERT_COLORS = {
 const RESPONDENT_COLORS = {
   students: '#3b82f6',
   teachers_active: '#10b981',
-  teachers_training: '#f59e0b'
+  teachers_training: '#eab308'
 }
 
 const RESPONDENT_LABELS = {
   students: 'Studenti',
   teachers_active: 'Insegnanti in servizio',
-  teachers_training: 'Insegnanti in formazione'
+  teachers_training: 'Insegnanti non in servizio'
 }
 
 function LikertAnalysis() {
@@ -135,7 +136,8 @@ function LikertAnalysis() {
       }}>
         {[
           { key: 'grafici', label: 'Grafici', icon: Icons.Chart },
-          { key: 'interpretazione', label: 'Interpretazione', icon: Icons.FileText }
+          { key: 'interpretazione', label: 'Interpretazione', icon: Icons.FileText },
+          { key: 'segmentazione', label: 'Analisi Segmentata', icon: Icons.Stats }
         ].map(tab => {
           const Icon = tab.icon
           return (
@@ -168,6 +170,53 @@ function LikertAnalysis() {
       {/* Content based on active tab */}
       {activeTab === 'interpretazione' ? (
         <LikertInterpretation />
+      ) : activeTab === 'segmentazione' ? (
+        <div style={{ padding: '2rem' }}>
+          <h3 style={{ fontSize: '1.3rem', marginBottom: '1rem', color: '#7c3aed' }}>
+            Analisi Segmentata per Variabili Demografiche
+          </h3>
+          <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '2rem' }}>
+            Confronto delle risposte a tutte le domande Likert suddiviso per variabili demografiche 
+            (sesso, età, titolo di studio, area disciplinare, livello scolastico).
+            Seleziona una domanda dal menu a tendina per esplorare le differenze tra sottogruppi.
+          </p>
+          
+          {/* Segmentazione per Studenti */}
+          <div style={{ marginBottom: '3rem' }}>
+            <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Icons.Student className="w-5 h-5" />
+              Studenti
+            </h4>
+            <SegmentedLikertAnalysis 
+              questions={likertData.questions.filter(q => q.respondent_type === 'students')}
+              respondentType="students"
+            />
+          </div>
+          
+          {/* Segmentazione per Insegnanti in Servizio */}
+          <div style={{ marginBottom: '3rem' }}>
+            <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Icons.Teacher className="w-5 h-5" />
+              Insegnanti in Servizio
+            </h4>
+            <SegmentedLikertAnalysis 
+              questions={likertData.questions.filter(q => q.respondent_type === 'teachers_active')}
+              respondentType="teachers_active"
+            />
+          </div>
+          
+          {/* Segmentazione per Insegnanti Non in Servizio */}
+          <div>
+            <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#eab308', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Icons.Teacher className="w-5 h-5" />
+              Insegnanti Non in Servizio
+            </h4>
+            <SegmentedLikertAnalysis 
+              questions={likertData.questions.filter(q => q.respondent_type === 'teachers_training')}
+              respondentType="teachers_training"
+            />
+          </div>
+        </div>
       ) : (
         <div>
 
@@ -279,14 +328,71 @@ function LikertAnalysis() {
                     teacherTrainingData={teacherTrainingQ}
                   />
 
+                  {/* Test di Significatività Statistica */}
+                  {likertData.shared_question_significance && likertData.shared_question_significance[key] && (
+                    <div style={{ 
+                      marginTop: '1.5rem',
+                      padding: '1rem', 
+                      backgroundColor: likertData.shared_question_significance[key].is_significant ? '#dcfce7' : '#f1f5f9',
+                      borderRadius: '8px',
+                      borderLeft: `4px solid ${likertData.shared_question_significance[key].is_significant ? '#10b981' : '#94a3b8'}`
+                    }}>
+                      <div style={{ 
+                        fontSize: '0.85rem', 
+                        fontWeight: '600', 
+                        marginBottom: '0.5rem', 
+                        color: '#1e293b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <Icons.TrendingUp className="w-4 h-4" />
+                        Test di Significatività Statistica
+                      </div>
+                      <div style={{ fontSize: '0.8rem', lineHeight: '1.5', color: '#475569' }}>
+                        <p style={{ marginBottom: '0.25rem' }}>
+                          <strong>Risultato:</strong> Le differenze tra i gruppi sono <strong>{likertData.shared_question_significance[key].significance_level}</strong>
+                        </p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.75rem' }}>
+                          <div>
+                            <strong>Kruskal-Wallis H:</strong> {likertData.shared_question_significance[key].kruskal_wallis_h} (p = {likertData.shared_question_significance[key].kruskal_wallis_p})
+                          </div>
+                          <div>
+                            <strong>ANOVA F:</strong> {likertData.shared_question_significance[key].anova_f} (p = {likertData.shared_question_significance[key].anova_p})
+                          </div>
+                        </div>
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', fontStyle: 'italic', color: '#64748b' }}>
+                          {likertData.shared_question_significance[key].is_significant 
+                            ? 'Le differenze osservate tra i gruppi sono statisticamente significative e non dovute al caso.'
+                            : 'Le differenze osservate potrebbero essere dovute al caso. Non ci sono evidenze statistiche sufficienti.'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Dettagli espandibili */}
                   {isExpanded && (
                     <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid #e2e8f0' }}>
                       <h4 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: '#475569' }}>Grafici dettagliati</h4>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem' }}>
-                        {studentQ && <DetailedQuestionView question={studentQ} label="Studenti" />}
-                        {teacherActiveQ && <DetailedQuestionView question={teacherActiveQ} label="Insegnanti in Servizio" />}
-                        {teacherTrainingQ && <DetailedQuestionView question={teacherTrainingQ} label="Insegnanti in Formazione" />}
+                        {studentQ && (
+                          <div>
+                            <DetailedQuestionView question={studentQ} label="Studenti" />
+                            <QuestionInterpretation question={studentQ} label="Studenti" />
+                          </div>
+                        )}
+                        {teacherActiveQ && (
+                          <div>
+                            <DetailedQuestionView question={teacherActiveQ} label="Insegnanti in Servizio" />
+                            <QuestionInterpretation question={teacherActiveQ} label="Insegnanti in Servizio" />
+                          </div>
+                        )}
+                        {teacherTrainingQ && (
+                          <div>
+                            <DetailedQuestionView question={teacherTrainingQ} label="Insegnanti Non in Servizio" />
+                            <QuestionInterpretation question={teacherTrainingQ} label="Insegnanti Non in Servizio" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -352,18 +458,120 @@ function LikertAnalysis() {
                 </div>
 
                 <div style={{ padding: '1.5rem', backgroundColor: '#ffffff' }}>
+                  {/* Statistiche riassuntive in alto */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+                    {activeQ && (
+                      <div style={{
+                        padding: '1rem',
+                        backgroundColor: RESPONDENT_COLORS.teachers_active + '15',
+                        borderRadius: '8px',
+                        border: `2px solid ${RESPONDENT_COLORS.teachers_active}40`
+                      }}>
+                        <div style={{ fontWeight: '600', color: RESPONDENT_COLORS.teachers_active, marginBottom: '0.75rem', fontSize: '0.95rem' }}>
+                          📊 Insegnanti in Servizio (n={activeQ.stats.total_responses})
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
+                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
+                            <span style={{ color: '#64748b' }}>Media:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_active }}>{activeQ.stats.mean}</strong>
+                          </div>
+                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
+                            <span style={{ color: '#64748b' }}>Mediana:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_active }}>{activeQ.stats.median}</strong>
+                          </div>
+                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
+                            <span style={{ color: '#64748b' }}>Moda:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_active }}>{activeQ.stats.mode}</strong>
+                          </div>
+                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
+                            <span style={{ color: '#64748b' }}>Dev. Std:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_active }}>{activeQ.stats.std_dev}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {trainingQ && (
+                      <div style={{
+                        padding: '1rem',
+                        backgroundColor: RESPONDENT_COLORS.teachers_training + '15',
+                        borderRadius: '8px',
+                        border: `2px solid ${RESPONDENT_COLORS.teachers_training}40`
+                      }}>
+                        <div style={{ fontWeight: '600', color: RESPONDENT_COLORS.teachers_training, marginBottom: '0.75rem', fontSize: '0.95rem' }}>
+                          📚 Insegnanti Non in Servizio (n={trainingQ.stats.total_responses})
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
+                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
+                            <span style={{ color: '#64748b' }}>Media:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_training }}>{trainingQ.stats.mean}</strong>
+                          </div>
+                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
+                            <span style={{ color: '#64748b' }}>Mediana:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_training }}>{trainingQ.stats.median}</strong>
+                          </div>
+                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
+                            <span style={{ color: '#64748b' }}>Moda:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_training }}>{trainingQ.stats.mode}</strong>
+                          </div>
+                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
+                            <span style={{ color: '#64748b' }}>Dev. Std:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_training }}>{trainingQ.stats.std_dev}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <TeacherComparisonBoxPlot
                     activeData={activeQ}
                     trainingData={trainingQ}
                   />
+
+                  {/* Box Test di Significatività Statistica - SOTTO IL GRAFICO */}
+                  {likertData.teacher_specific_significance && likertData.teacher_specific_significance[key] && (
+                    <div style={{
+                      padding: '1rem',
+                      marginTop: '2rem',
+                      backgroundColor: likertData.teacher_specific_significance[key].is_significant ? '#dcfce7' : '#f1f5f9',
+                      border: `2px solid ${likertData.teacher_specific_significance[key].is_significant ? '#16a34a' : '#94a3b8'}`,
+                      borderRadius: '8px'
+                    }}>
+                      <div style={{ fontWeight: '600', fontSize: '0.95rem', marginBottom: '0.75rem', color: '#1e293b' }}>
+                        📊 Test di Significatività Statistica
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '0.5rem' }}>
+                        <strong>Risultato:</strong> Le differenze tra i gruppi sono{' '}
+                        <strong style={{ color: likertData.teacher_specific_significance[key].is_significant ? '#16a34a' : '#64748b' }}>
+                          {likertData.teacher_specific_significance[key].significance_level}
+                        </strong>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <div>
+                          <strong>Kruskal-Wallis H:</strong> {likertData.teacher_specific_significance[key].kruskal_wallis_h} 
+                          {' '}(p = {likertData.teacher_specific_significance[key].kruskal_wallis_p})
+                        </div>
+                        <div>
+                          <strong>ANOVA F:</strong> {likertData.teacher_specific_significance[key].anova_f}
+                          {' '}(p = {likertData.teacher_specific_significance[key].anova_p})
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                        {likertData.teacher_specific_significance[key].is_significant
+                          ? 'Le differenze osservate tra i gruppi sono statisticamente significative e non dovute al caso.'
+                          : 'Le differenze osservate tra i gruppi potrebbero essere dovute al caso (non significative).'}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Grafici dettagliati espandibili */}
                   {isExpanded && (
                     <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid #e2e8f0' }}>
                       <h4 style={{ fontSize: '1rem', marginBottom: '1.5rem', color: '#475569' }}>Grafici dettagliati</h4>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem' }}>
-                        {activeQ && <DetailedQuestionView question={activeQ} label="Insegnanti in Servizio" />}
-                        {trainingQ && <DetailedQuestionView question={trainingQ} label="Insegnanti in Formazione" />}
+                        {activeQ && (
+                          <div>
+                            <DetailedQuestionView question={activeQ} label="Insegnanti in Servizio" />
+                            <QuestionInterpretation question={activeQ} label="Insegnanti in Servizio" />
+                          </div>
+                        )}
+                        {trainingQ && (
+                          <div>
+                            <DetailedQuestionView question={trainingQ} label="Insegnanti Non in Servizio" />
+                            <QuestionInterpretation question={trainingQ} label="Insegnanti Non in Servizio" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -441,6 +649,29 @@ function LikertAnalysis() {
               <div style={{ padding: '1.5rem', backgroundColor: '#ffffff' }}>
                 <MultipleStudentBoxPlots questions={studentQuestions} />
 
+                {/* Box informativo - Nota sui test statistici */}
+                <div style={{
+                  padding: '1rem',
+                  marginTop: '2rem',
+                  backgroundColor: '#f0f9ff',
+                  border: '2px solid #3b82f6',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{ fontWeight: '600', fontSize: '0.95rem', marginBottom: '0.75rem', color: '#1e293b' }}>
+                    ℹ️ Nota sui Test di Significatività Statistica
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: '1.5' }}>
+                    <p style={{ margin: '0 0 0.5rem 0' }}>
+                      <strong>Le domande specifiche studenti non includono test di significatività statistica</strong> perché rappresentano 
+                      un singolo gruppo di rispondenti (n={studentQuestions[0]?.stats.total_responses || 0}).
+                    </p>
+                    <p style={{ margin: '0' }}>
+                      I test statistici (Kruskal-Wallis, ANOVA) richiedono almeno <strong>due gruppi indipendenti</strong> da confrontare. 
+                      Per queste domande sono disponibili le statistiche descrittive complete (media, mediana, moda, deviazione standard, quartili).
+                    </p>
+                  </div>
+                </div>
+
                 {/* Grafici dettagliati espandibili */}
                 {isExpanded && (
                   <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid #e2e8f0' }}>
@@ -457,6 +688,7 @@ function LikertAnalysis() {
                             {q.question_text}
                           </h4>
                           <DetailedQuestionView question={q} label="Studenti" />
+                          <QuestionInterpretation question={q} label="Studenti" />
                         </div>
                       ))}
                     </div>
@@ -708,9 +940,10 @@ function MultipleStudentBoxPlots({ questions }) {
             <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.5rem' }}>
               Q{idx + 1}: {q.question_text}
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.25rem' }}>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem' }}>
               <div>Media: <strong style={{ color: colors[idx] }}>{q.stats.mean}</strong></div>
               <div>Mediana: <strong style={{ color: colors[idx] }}>{q.stats.median}</strong></div>
+              <div>Moda: <strong style={{ color: colors[idx] }}>{q.stats.mode}</strong></div>
               <div>n: <strong style={{ color: colors[idx] }}>{q.stats.total_responses}</strong></div>
             </div>
           </div>
@@ -730,16 +963,20 @@ function TeacherComparisonBoxPlot({ activeData, trainingData }) {
       type: 'teachers_active',
       ...activeData.stats.quartiles,
       mean: activeData.stats.mean,
+      mode: activeData.stats.mode,
+      std_dev: activeData.stats.std_dev,
       n: activeData.stats.total_responses
     })
   }
 
   if (trainingData) {
     boxPlotData.push({
-      name: 'In formazione',
+      name: 'Non in Servizio',
       type: 'teachers_training',
       ...trainingData.stats.quartiles,
       mean: trainingData.stats.mean,
+      mode: trainingData.stats.mode,
+      std_dev: trainingData.stats.std_dev,
       n: trainingData.stats.total_responses
     })
   }
@@ -877,6 +1114,8 @@ function TeacherComparisonBoxPlot({ activeData, trainingData }) {
               <div>Q3: {entry.q3}</div>
               <div>Mediana: {entry.q2}</div>
               <div>Media: {entry.mean}</div>
+              <div>Moda: {entry.mode}</div>
+              <div>Dev. Std: {entry.std_dev}</div>
             </div>
           </div>
         ))}
@@ -911,7 +1150,7 @@ function SingleQuestionBoxPlot({ question, color, groupLabel }) {
         </div>
 
         {/* Statistiche in card */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
           <div style={{ padding: '0.5rem', backgroundColor: '#f8fafc', borderRadius: '4px', textAlign: 'center' }}>
             <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Media</div>
             <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color }}>{stats.mean}</div>
@@ -919,6 +1158,10 @@ function SingleQuestionBoxPlot({ question, color, groupLabel }) {
           <div style={{ padding: '0.5rem', backgroundColor: '#f8fafc', borderRadius: '4px', textAlign: 'center' }}>
             <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Mediana</div>
             <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color }}>{stats.median}</div>
+          </div>
+          <div style={{ padding: '0.5rem', backgroundColor: '#f8fafc', borderRadius: '4px', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Moda</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color }}>{stats.mode}</div>
           </div>
           <div style={{ padding: '0.5rem', backgroundColor: '#f8fafc', borderRadius: '4px', textAlign: 'center' }}>
             <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Dev.Std</div>
@@ -1059,6 +1302,8 @@ function ComparisonBoxPlot({ studentData, teacherActiveData, teacherTrainingData
       type: 'students',
       ...studentData.stats.quartiles,
       mean: studentData.stats.mean,
+      mode: studentData.stats.mode,
+      std_dev: studentData.stats.std_dev,
       n: studentData.stats.total_responses
     })
   }
@@ -1069,16 +1314,20 @@ function ComparisonBoxPlot({ studentData, teacherActiveData, teacherTrainingData
       type: 'teachers_active',
       ...teacherActiveData.stats.quartiles,
       mean: teacherActiveData.stats.mean,
+      mode: teacherActiveData.stats.mode,
+      std_dev: teacherActiveData.stats.std_dev,
       n: teacherActiveData.stats.total_responses
     })
   }
 
   if (teacherTrainingData) {
     boxPlotData.push({
-      name: 'In formazione',
+      name: 'Non in Servizio',
       type: 'teachers_training',
       ...teacherTrainingData.stats.quartiles,
       mean: teacherTrainingData.stats.mean,
+      mode: teacherTrainingData.stats.mode,
+      std_dev: teacherTrainingData.stats.std_dev,
       n: teacherTrainingData.stats.total_responses
     })
   }
@@ -1217,6 +1466,8 @@ function ComparisonBoxPlot({ studentData, teacherActiveData, teacherTrainingData
               <div>Q3: {entry.q3}</div>
               <div>Mediana: {entry.q2}</div>
               <div>Media: {entry.mean}</div>
+              <div>Moda: {entry.mode}</div>
+              <div>Dev. Std: {entry.std_dev}</div>
             </div>
           </div>
         ))}
@@ -1225,6 +1476,312 @@ function ComparisonBoxPlot({ studentData, teacherActiveData, teacherTrainingData
   )
 }
 
+// Componente per l'interpretazione di una singola domanda
+function QuestionInterpretation({ question, label }) {
+  const stats = question.stats
+  
+  // Calcola il valore modale (più frequente)
+  const modeEntry = Object.entries(stats.distribution).reduce((max, curr) => 
+    curr[1] > max[1] ? curr : max
+  )
+  const modeValue = parseInt(modeEntry[0])
+  const modeCount = modeEntry[1]
+  const modePercentage = ((modeCount / stats.total_responses) * 100).toFixed(1)
+
+  // Classifica la tendenza generale
+  const mean = parseFloat(stats.mean)
+  let tendenza = ''
+  let colore = ''
+  if (mean < 3) {
+    tendenza = 'negativa'
+    colore = '#ef4444'
+  } else if (mean < 5) {
+    tendenza = 'neutra'
+    colore = '#f59e0b'
+  } else {
+    tendenza = 'positiva'
+    colore = '#22c55e'
+  }
+
+  // Calcola la dispersione
+  const stdDev = parseFloat(stats.std_dev)
+  const iqr = stats.quartiles?.q3 && stats.quartiles?.q1 
+    ? (parseFloat(stats.quartiles.q3) - parseFloat(stats.quartiles.q1)).toFixed(2)
+    : 'N/A'
+  
+  let dispersioneText = ''
+  if (stdDev < 1.5) {
+    dispersioneText = 'Le risposte sono molto concentrate, indicando un forte consenso.'
+  } else if (stdDev < 2.5) {
+    dispersioneText = 'Le risposte mostrano una moderata dispersione, con opinioni relativamente variegate.'
+  } else {
+    dispersioneText = 'Le risposte sono molto disperse, evidenziando opinioni fortemente divergenti.'
+  }
+
+  // Analisi della distribuzione
+  const lowValues = Object.entries(stats.distribution)
+    .filter(([val, _]) => parseInt(val) <= 3)
+    .reduce((sum, [_, count]) => sum + count, 0)
+  const highValues = Object.entries(stats.distribution)
+    .filter(([val, _]) => parseInt(val) >= 5)
+    .reduce((sum, [_, count]) => sum + count, 0)
+  
+  const lowPercentage = ((lowValues / stats.total_responses) * 100).toFixed(1)
+  const highPercentage = ((highValues / stats.total_responses) * 100).toFixed(1)
+
+  return (
+    <div style={{
+      marginTop: '1.5rem',
+      padding: '1.25rem',
+      backgroundColor: '#f8fafc',
+      borderRadius: '8px',
+      borderLeft: `4px solid ${colore}`
+    }}>
+      <h5 style={{
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        marginBottom: '1rem',
+        color: '#1e293b',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem'
+      }}>
+        <Icons.FileText className="w-4 h-4" />
+        Interpretazione dei dati
+      </h5>
+      
+      <div style={{ fontSize: '0.875rem', lineHeight: '1.6', color: '#475569' }}>
+        <p style={{ marginBottom: '0.75rem' }}>
+          <strong>Tendenza generale:</strong> Le risposte del gruppo <strong>{label}</strong> mostrano 
+          una tendenza <strong style={{ color: colore }}>{tendenza}</strong> con una media 
+          di <strong>{stats.mean}</strong> e mediana di <strong>{stats.median}</strong> sulla scala 1-7.
+        </p>
+        
+        <p style={{ marginBottom: '0.75rem' }}>
+          <strong>Valore più frequente:</strong> Il valore <strong>{modeValue}</strong> è stato 
+          scelto da <strong>{modeCount} rispondenti ({modePercentage}%)</strong>, rappresentando 
+          l'opinione più comune.
+        </p>
+        
+        <p style={{ marginBottom: '0.75rem' }}>
+          <strong>Distribuzione delle opinioni:</strong> Il <strong>{lowPercentage}%</strong> ha espresso 
+          valutazioni basse (1-3), mentre il <strong>{highPercentage}%</strong> ha dato valutazioni 
+          alte (5-7). {dispersioneText}
+        </p>
+        
+        <p style={{ marginBottom: '0' }}>
+          <strong>Variabilità:</strong> La deviazione standard di <strong>{stats.std_dev}</strong> e 
+          l'intervallo interquartile (IQR) di <strong>{iqr}</strong> indicano 
+          {stdDev < 1.5 ? ' una forte omogeneità nelle risposte.' : 
+           stdDev < 2.5 ? ' una moderata variabilità nelle opinioni.' :
+           ' una significativa eterogeneità di vedute.'}
+        </p>
+      </div>
+
+      {/* Sezione Discussione */}
+      <div style={{ 
+        marginTop: '1.5rem', 
+        paddingTop: '1.5rem', 
+        borderTop: '2px solid #e2e8f0' 
+      }}>
+        <h5 style={{
+          fontSize: '0.9rem',
+          fontWeight: '600',
+          marginBottom: '1rem',
+          color: '#1e293b',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <Icons.Lightbulb className="w-4 h-4" />
+          Discussione
+        </h5>
+        
+        <div style={{ fontSize: '0.875rem', lineHeight: '1.7', color: '#475569' }}>
+          {/* Discussione contestualizzata in base alla tendenza */}
+          {mean < 3 && (
+            <>
+              <h6 style={{ fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.75rem', color: '#1e293b' }}>
+                Un segnale d'allarme da non sottovalutare
+              </h6>
+              <p style={{ marginBottom: '0.75rem' }}>
+                L'analisi delle risposte del gruppo <strong>{label}</strong> su questa domanda rivela un <strong>pattern 
+                critico che merita attenzione immediata</strong>. Con una media di <strong>{stats.mean}</strong> su una 
+                scala 1-7 e una mediana ferma a <strong>{stats.median}</strong>, ci troviamo chiaramente nella fascia 
+                bassa della valutazione. Questo non è un dato isolato: il <strong>{lowPercentage}%</strong> dei 
+                rispondenti ha espresso giudizi decisamente negativi (valori 1-3), mentre solo il <strong>{highPercentage}%</strong> 
+                ha dato valutazioni positive (5-7).
+              </p>
+              <p style={{ marginBottom: '0.75rem' }}>
+                La distribuzione mostra che il valore più frequente è <strong>{modeValue}</strong>, scelto da{' '}
+                <strong>{modeCount} persone su {stats.total_responses}</strong> ({modePercentage}%). Questo significa 
+                che l'opinione modale del gruppo si colloca nella parte bassa della scala, confermando una percezione 
+                negativa diffusa e non limitata a una minoranza.
+              </p>
+              
+              <h6 style={{ fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.75rem', marginTop: '1rem', color: '#1e293b' }}>
+                Implicazioni e cause possibili
+              </h6>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Questo risultato solleva questioni importanti. <strong>Perché il gruppo {label} esprime valutazioni 
+                così basse?</strong> Le cause potrebbero essere molteplici: esperienze negative concrete, aspettative 
+                disattese, mancanza di risorse adeguate, o una reale inadeguatezza dell'oggetto valutato. La deviazione 
+                standard di <strong>{stats.std_dev}</strong> {stdDev < 1.5 ? 
+                  'indica un forte consenso su questa valutazione negativa, rendendo il dato ancora più significativo.' :
+                  'suggerisce però che non tutti concordano: esistono sottogruppi con esperienze molto diverse, il che potrebbe indicare diseguaglianze o contesti variabili.'}
+              </p>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Se confrontiamo questo dato con altre domande o con altri gruppi di rispondenti, potremmo individuare 
+                <strong> pattern sistematici</strong> che aiutano a comprendere meglio le radici del problema. È possibile 
+                che questa criticità sia legata a fattori specifici (formazione, strumenti, supporto) che potrebbero 
+                essere affrontati con interventi mirati.
+              </p>
+              
+              <h6 style={{ fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.75rem', marginTop: '1rem', color: '#1e293b' }}>
+                Raccomandazioni per l'azione
+              </h6>
+              <p style={{ marginBottom: '0' }}>
+                Un risultato così marcatamente negativo <strong>richiede azioni concrete e tempestive</strong>. Non basta 
+                prendere atto del problema: serve un'analisi più approfondita (magari qualitativa, con interviste o focus group) 
+                per capire <em>cosa esattamente</em> non funziona. Solo così si possono progettare interventi efficaci che 
+                affrontino le cause reali e non solo i sintomi. Ignorare questo dato significherebbe perdere un'opportunità 
+                preziosa di miglioramento e rischiare di consolidare percezioni negative che potrebbero diventare sempre 
+                più difficili da invertire.
+              </p>
+            </>
+          )}
+
+          {mean >= 3 && mean < 5 && (
+            <>
+              <h6 style={{ fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.75rem', color: '#1e293b' }}>
+                La zona grigia: né favorevoli né contrari
+              </h6>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Le risposte del gruppo <strong>{label}</strong> si collocano in quella che potremmo definire la <strong>"zona 
+                di mezzo"</strong> della scala Likert, con una media di <strong>{stats.mean}</strong> e mediana a{' '}
+                <strong>{stats.median}</strong>. Questa posizione centrale è sempre la più difficile da interpretare: 
+                rappresenta vera neutralità, incertezza, ambivalenza, o forse il risultato di opinioni opposte che si 
+                bilanciano reciprocamente?
+              </p>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Guardando la distribuzione, vediamo che il <strong>{lowPercentage}%</strong> esprime giudizi negativi (1-3), 
+                mentre il <strong>{highPercentage}%</strong> si orienta verso valutazioni positive (5-7). Il valore più 
+                frequente è <strong>{modeValue}</strong> ({modePercentage}% dei rispondenti), che {modeValue === 4 ? 
+                'corrisponde esattamente al punto centrale della scala, suggerendo vera neutralità per molti.' :
+                'indica una leggera tendenza verso ' + (modeValue < 4 ? 'il versante negativo' : 'il versante positivo') + ' della scala.'
+                }
+              </p>
+              
+              <h6 style={{ fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.75rem', marginTop: '1rem', color: '#1e293b' }}>
+                Interpretazione critica: cosa nasconde la media?
+              </h6>
+              <p style={{ marginBottom: '0.75rem' }}>
+                La deviazione standard di <strong>{stats.std_dev}</strong> ci dice qualcosa di importante sulla natura 
+                di questa posizione centrale. {stdDev < 1.5 ? (
+                  <>Con una dispersione relativamente bassa, sembra che <strong>molti rispondenti condividano effettivamente 
+                  una posizione neutra o incerta</strong>. Non si tratta quindi di un compromesso numerico tra estremi opposti, 
+                  ma di una genuina ambivalenza o mancanza di opinione forte. Questo potrebbe indicare che il gruppo {label} 
+                  non ha ancora maturato un giudizio chiaro su questa dimensione, forse per mancanza di esperienza diretta 
+                  o di informazioni sufficienti.</>
+                ) : (
+                  <>Con una dispersione elevata, questa media centrale <strong>maschera in realtà opinioni molto diverse</strong>. 
+                  Il gruppo {label} è probabilmente <em>diviso</em>: alcuni hanno esperienze o convinzioni molto positive, 
+                  altri molto negative. La "neutralità" è quindi illusoria: è il risultato matematico di posizioni polarizzate 
+                  che si annullano reciprocamente nella media. Questo è un dato critico perché suggerisce l'esistenza di 
+                  sottogruppi con percezioni completamente opposte.</>
+                )}
+              </p>
+              
+              <h6 style={{ fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.75rem', marginTop: '1rem', color: '#1e293b' }}>
+                Direzioni per l'approfondimento
+              </h6>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Questo tipo di risultato <strong>richiede di andare oltre i numeri</strong>. Sarebbe utile segmentare 
+                i dati per identificare sottogruppi: età, esperienza, contesto, formazione ricevuta potrebbero essere 
+                variabili discriminanti che spiegherebbero la dispersione. Chi sono coloro che danno valutazioni alte? 
+                E chi invece le dà basse? Cosa li differenzia?
+              </p>
+              <p style={{ marginBottom: '0' }}>
+                Dal punto di vista pratico, una posizione neutrale <strong>non è necessariamente un problema</strong>, 
+                ma rappresenta un'opportunità: questi rispondenti potrebbero essere "convincibili" in una direzione o 
+                nell'altra in base a nuove esperienze, informazioni, o interventi. Capire cosa potrebbe spostare l'ago 
+                della bilancia verso valutazioni più positive potrebbe essere una strategia più efficace che cercare 
+                di intervenire su chi ha già opinioni fortemente radicate.
+              </p>
+            </>
+          )}
+
+          {mean >= 5 && (
+            <>
+              <h6 style={{ fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.75rem', color: '#1e293b' }}>
+                Un risultato positivo: elemento di forza
+              </h6>
+              <p style={{ marginBottom: '0.75rem' }}>
+                I numeri parlano chiaro: il gruppo <strong>{label}</strong> esprime una <strong>valutazione decisamente 
+                favorevole</strong> su questa dimensione. Con una media di <strong>{stats.mean}</strong> e mediana a{' '}
+                <strong>{stats.median}</strong>, ci troviamo nella fascia alta della scala Likert. Il{' '}
+                <strong>{highPercentage}%</strong> dei rispondenti ha dato valutazioni positive o molto positive (5-7), 
+                mentre solo il <strong>{lowPercentage}%</strong> si è collocato sui valori bassi (1-3).
+              </p>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Il valore più scelto è <strong>{modeValue}</strong>, indicato da <strong>{modeCount} persone su {stats.total_responses}</strong> 
+                ({modePercentage}%). Questo conferma che non si tratta di una media "gonfiata" da pochi valori estremi, 
+                ma di una percezione positiva effettivamente diffusa e condivisa dal gruppo. {modeValue >= 6 ? 
+                'La concentrazione su valori così alti indica addirittura un certo entusiasmo.' :
+                'La massa critica si colloca su un\'opinione favorevole, anche se non necessariamente entusiastica.'}
+              </p>
+              
+              <h6 style={{ fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.75rem', marginTop: '1rem', color: '#1e293b' }}>
+                Quanto è solido questo consenso?
+              </h6>
+              <p style={{ marginBottom: '0.75rem' }}>
+                {stdDev < 1.5 ? (
+                  <>La deviazione standard contenuta (<strong>{stats.std_dev}</strong>) è un <strong>indicatore di robustezza</strong>: 
+                  non solo la valutazione è positiva, ma è anche condivisa in modo relativamente omogeneo. Questo significa 
+                  che il gruppo {label} presenta un <em>consenso forte</em> su questa dimensione. Non ci sono grandi 
+                  sacche di dissenso o esperienze radicalmente diverse: la maggioranza vede le cose nello stesso modo, 
+                  e quel modo è positivo.</>
+                ) : (
+                  <>Tuttavia, la deviazione standard più elevata (<strong>{stats.std_dev}</strong>) ci invita a <strong>non 
+                  essere troppo trionfalistici</strong>. Nonostante la media alta, esiste una dispersione significativa 
+                  nelle risposte. Questo significa che, all'interno del gruppo {label}, ci sono sottogruppi con esperienze 
+                  molto diverse. Il <strong>{lowPercentage}%</strong> che ha dato valutazioni basse non va ignorato: 
+                  rappresenta una minoranza, certo, ma una minoranza che evidentemente non condivide l'entusiasmo della 
+                  maggioranza. Cosa li differenzia? Hanno avuto esperienze negative? Hanno aspettative diverse? Mancano 
+                  di risorse o supporto?</>
+                )}
+              </p>
+              
+              <h6 style={{ fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.75rem', marginTop: '1rem', color: '#1e293b' }}>
+                Capitalizzare il successo senza darlo per scontato
+              </h6>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Un risultato positivo è sempre una buona notizia, ma <strong>va gestito con intelligenza</strong>. 
+                Prima di tutto, bisogna chiedersi: <em>su cosa si fonda questa percezione favorevole?</em> È il risultato 
+                di esperienze concrete e positive? Di aspettative ottimistiche non ancora messe alla prova? Di un confronto 
+                favorevole con situazioni precedenti peggiori? La risposta a queste domande determina quanto sia "stabile" 
+                questo risultato e quanto rischi di erodersi nel tempo.
+              </p>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Secondo, un buon risultato attuale <strong>non garantisce un buon risultato futuro</strong>. Le aspettative 
+                tendono ad alzarsi: ciò che oggi è percepito come positivo potrebbe diventare "normale" domani, e le stesse 
+                condizioni potrebbero generare valutazioni più tiepide. Mantenere una percezione positiva richiede miglioramento 
+                continuo e attenzione alle esigenze emergenti del gruppo.
+              </p>
+              <p style={{ marginBottom: '0' }}>
+                Infine, questo dato rappresenta un <strong>capitale su cui costruire</strong>. Se il gruppo {label} ha 
+                una percezione favorevole su questa dimensione, può diventare un punto di leva per affrontare altre aree 
+                più critiche. Ad esempio, se si fidano di uno strumento o di un processo, potrebbero essere più aperti 
+                a sperimentazioni o innovazioni in altri ambiti. La chiave è non sprecare questo capitale e utilizzarlo 
+                strategicamente per promuovere crescita e miglioramento continuo.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // Vista dettagliata singola domanda
 function DetailedQuestionView({ question, label }) {
@@ -1250,7 +1807,7 @@ function DetailedQuestionView({ question, label }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
         <div style={{ textAlign: 'center', padding: '0.5rem', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
           <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Media</div>
           <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color }}>{question.stats.mean}</div>
@@ -1258,6 +1815,10 @@ function DetailedQuestionView({ question, label }) {
         <div style={{ textAlign: 'center', padding: '0.5rem', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
           <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Mediana</div>
           <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color }}>{question.stats.median}</div>
+        </div>
+        <div style={{ textAlign: 'center', padding: '0.5rem', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
+          <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Moda</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color }}>{question.stats.mode}</div>
         </div>
         <div style={{ textAlign: 'center', padding: '0.5rem', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
           <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Dev. Std</div>

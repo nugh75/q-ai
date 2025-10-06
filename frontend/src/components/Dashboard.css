@@ -10,9 +10,15 @@
   padding: 1.5rem 2rem;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   border-bottom: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .dashboard-header h1 {
@@ -23,6 +29,14 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.dashboard-header-subtitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 400;
+  color: #64748b;
+  padding-left: 2.5rem;
 }
 
 .header-stats {

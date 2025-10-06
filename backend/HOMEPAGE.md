@@ -1,6 +1,6 @@
-# Benvenuti alla Piattaforma di Analisi Questionario AI
+# Rischi, opportunità e buone pratiche dell'utilizzo dell'intelligenza artificiale nell'educazione
 
-## Progetto di Ricerca sull'Intelligenza Artificiale nell'Educazione
+## Un'indagine sul rapporto tra intelligenza artificiale ed educazione nel contesto italiano
 
 Questa piattaforma presenta i risultati di un'indagine approfondita sull'utilizzo e la percezione dell'intelligenza artificiale nel contesto educativo italiano.
 

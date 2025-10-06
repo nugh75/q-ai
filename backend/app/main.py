@@ -2482,6 +2482,9 @@ def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 q3 = np.percentile(sorted_values, 75)
                 min_val = min(sorted_values)
                 max_val = max(sorted_values)
+                
+                # Calcola moda (valore più frequente)
+                mode_value = max(distribution, key=distribution.get)
 
                 questions.append({
                     'respondent_type': 'students',
@@ -2493,6 +2496,7 @@ def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
                         'total_responses': len(values),
                         'mean': round(statistics.mean(values), 2),
                         'median': round(statistics.median(values), 2),
+                        'mode': mode_value,
                         'std_dev': round(statistics.stdev(values), 2) if len(values) > 1 else 0,
                         'distribution': distribution,
                         'quartiles': {
@@ -2525,6 +2529,9 @@ def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 q3 = np.percentile(sorted_values, 75)
                 min_val = min(sorted_values)
                 max_val = max(sorted_values)
+                
+                # Calcola moda (valore più frequente)
+                mode_value = max(distribution, key=distribution.get)
 
                 questions.append({
                     'respondent_type': 'teachers_active',
@@ -2536,6 +2543,7 @@ def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
                         'total_responses': len(values),
                         'mean': round(statistics.mean(values), 2),
                         'median': round(statistics.median(values), 2),
+                        'mode': mode_value,
                         'std_dev': round(statistics.stdev(values), 2) if len(values) > 1 else 0,
                         'distribution': distribution,
                         'quartiles': {
@@ -2568,6 +2576,9 @@ def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 q3 = np.percentile(sorted_values, 75)
                 min_val = min(sorted_values)
                 max_val = max(sorted_values)
+                
+                # Calcola moda (valore più frequente)
+                mode_value = max(distribution, key=distribution.get)
 
                 questions.append({
                     'respondent_type': 'teachers_training',
@@ -2579,6 +2590,7 @@ def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
                         'total_responses': len(values),
                         'mean': round(statistics.mean(values), 2),
                         'median': round(statistics.median(values), 2),
+                        'mode': mode_value,
                         'std_dev': round(statistics.stdev(values), 2) if len(values) > 1 else 0,
                         'distribution': distribution,
                         'quartiles': {
@@ -2591,6 +2603,103 @@ def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
                     }
                 })
 
+        # Test di significatività statistica per domande condivise
+        shared_stats = {}
+        for shared_key in shared_questions:
+            # Raccogli valori per ogni gruppo rispondente
+            groups_values = {}
+            for q in questions:
+                if q['shared_key'] == shared_key:
+                    # Ottieni i valori raw per il test statistico
+                    if q['respondent_type'] == 'students':
+                        values = [getattr(s, shared_key) for s in students if getattr(s, shared_key) is not None]
+                        if len(values) > 1:
+                            groups_values['students'] = values
+                    elif q['respondent_type'] == 'teachers_active':
+                        values = [getattr(t, shared_key) for t in teachers_active if getattr(t, shared_key) is not None]
+                        if len(values) > 1:
+                            groups_values['teachers_active'] = values
+                    elif q['respondent_type'] == 'teachers_training':
+                        values = [getattr(t, shared_key) for t in teachers_training if getattr(t, shared_key) is not None]
+                        if len(values) > 1:
+                            groups_values['teachers_training'] = values
+            
+            # Esegui test statistici se ci sono almeno 2 gruppi
+            if len(groups_values) >= 2:
+                try:
+                    from scipy import stats as scipy_stats
+                    all_values = list(groups_values.values())
+                    
+                    # Kruskal-Wallis (non parametrico)
+                    h_statistic, p_value_kruskal = scipy_stats.kruskal(*all_values)
+                    
+                    # ANOVA (parametrico)
+                    f_statistic, p_value_anova = scipy_stats.f_oneway(*all_values)
+                    
+                    # Determina significatività
+                    significance_level = "non significativo"
+                    if p_value_kruskal < 0.001:
+                        significance_level = "altamente significativo (p < 0.001)"
+                    elif p_value_kruskal < 0.05:
+                        significance_level = "significativo (p < 0.05)"
+                    
+                    shared_stats[shared_key] = {
+                        'groups_compared': list(groups_values.keys()),
+                        'kruskal_wallis_h': round(float(h_statistic), 4),
+                        'kruskal_wallis_p': round(float(p_value_kruskal), 4),
+                        'anova_f': round(float(f_statistic), 4),
+                        'anova_p': round(float(p_value_anova), 4),
+                        'significance_level': significance_level,
+                        'is_significant': bool(p_value_kruskal < 0.05)
+                    }
+                except ImportError:
+                    pass
+                except Exception as e:
+                    logging.warning(f"Errore calcolo significatività per {shared_key}: {e}")
+
+        # Test di significatività per domande specifiche insegnanti (attivi vs in formazione)
+        teacher_specific_stats = {}
+        teacher_specific_questions = set(dict(teacher_likert_fields).keys()) - shared_questions
+        
+        for field_name in teacher_specific_questions:
+            # Raccogli valori per insegnanti attivi e in formazione
+            active_values = [getattr(t, field_name) for t in teachers_active if getattr(t, field_name) is not None]
+            training_values = [getattr(t, field_name) for t in teachers_training if getattr(t, field_name) is not None]
+            
+            # Esegui test statistici solo se entrambi i gruppi hanno almeno 2 valori
+            if len(active_values) > 1 and len(training_values) > 1:
+                try:
+                    from scipy import stats as scipy_stats
+                    
+                    # Kruskal-Wallis (non parametrico) - anche per 2 gruppi equivale a Mann-Whitney
+                    h_statistic, p_value_kruskal = scipy_stats.kruskal(active_values, training_values)
+                    
+                    # ANOVA (parametrico) - equivale a t-test per 2 gruppi
+                    f_statistic, p_value_anova = scipy_stats.f_oneway(active_values, training_values)
+                    
+                    # Determina significatività
+                    significance_level = "non significativo"
+                    if p_value_kruskal < 0.001:
+                        significance_level = "altamente significativo (p < 0.001)"
+                    elif p_value_kruskal < 0.05:
+                        significance_level = "significativo (p < 0.05)"
+                    
+                    teacher_specific_stats[field_name] = {
+                        'groups_compared': ['teachers_active', 'teachers_training'],
+                        'n_active': len(active_values),
+                        'n_training': len(training_values),
+                        'kruskal_wallis_h': round(float(h_statistic), 4),
+                        'kruskal_wallis_p': round(float(p_value_kruskal), 4),
+                        'anova_f': round(float(f_statistic), 4),
+                        'anova_p': round(float(p_value_anova), 4),
+                        'significance_level': significance_level,
+                        'is_significant': bool(p_value_kruskal < 0.05)
+                    }
+                except ImportError:
+                    pass
+                except Exception as e:
+                    logging.warning(f"Errore calcolo significatività per domanda insegnanti {field_name}: {e}")
+
         # Statistiche generali
         stats = {
             'total_questions': len(questions),
@@ -2602,11 +2711,305 @@ def get_likert_questions(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
         return {
             'questions': questions,
-            'statistics': stats
+            'statistics': stats,
+            'shared_question_significance': shared_stats,
+            'teacher_specific_significance': teacher_specific_stats
         }
 
     except Exception as e:
         logger.error(f"Errore nel recupero domande Likert: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/likert-segmentation")
+def get_likert_segmentation(
+    question_column: str,
+    respondent_type: str,  # "students", "teachers_active", "teachers_training"
+    segment_by: str,  # "gender", "age_group", "education_level", "discipline_area", "school_level"
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Analisi di segmentazione per una domanda Likert specifica.
+    Restituisce statistiche suddivise per sottogruppi demografici.
+    
+    Args:
+        question_column: Nome colonna (es. "practical_competence")
+        respondent_type: Tipo rispondente ("students", "teachers_active", "teachers_training")
+        segment_by: Variabile di segmentazione ("gender", "age_group", "education_level", "discipline_area", "school_level")
+    """
+    try:
+        logger.info(f"Segmentazione Likert - question: {question_column}, type: {respondent_type}, segment: {segment_by}")
+        
+        # Determina tabella e filtri
+        if respondent_type == "students":
+            model = StudentResponse
+            teaching_filter = None
+        else:
+            model = TeacherResponse
+            if respondent_type == "teachers_active":
+                teaching_filter = "Attualmente insegno."
+            else:  # teachers_training
+                teaching_filter = "Ancora non insegno, ma sto seguendo o ho concluso un percorso PEF (Percorso di formazione iniziale degli insegnanti)."
+        
+        # Query base
+        query = db.query(model)
+        if teaching_filter:
+            query = query.filter(model.currently_teaching == teaching_filter)
+        
+        # Verifica che la colonna esista
+        if not hasattr(model, question_column):
+            raise HTTPException(status_code=400, detail=f"Colonna {question_column} non trovata")
+        
+        # Mappa segment_by alla colonna corretta
+        segment_column_map = {
+            "gender": "gender",
+            "age_group": "age",  # Verrà raggruppato in fasce
+            "education_level": "education_level",
+            "discipline_area": "subject_area" if respondent_type != "students" else "study_path",
+            "school_level": "school_level" if respondent_type != "students" else "school_type",
+            "school_type": "school_type"  # Solo per studenti
+        }
+        
+        if segment_by not in segment_column_map:
+            raise HTTPException(status_code=400, detail=f"Segmentazione {segment_by} non supportata")
+        
+        segment_column = segment_column_map[segment_by]
+        
+        # Verifica che la colonna di segmentazione esista
+        if not hasattr(model, segment_column):
+            raise HTTPException(status_code=400, detail=f"Colonna segmentazione {segment_column} non trovata")
+        
+        # Recupera i dati
+        results = query.all()
+        
+        # Raggruppa per segmento
+        segments = {}
+        
+        for row in results:
+            value = getattr(row, question_column)
+            if value is None:
+                continue
+            
+            segment_value = getattr(row, segment_column)
+            if segment_value is None:
+                segment_value = "Non specificato"
+            
+            # Per età, crea fasce
+            if segment_by == "age_group":
+                try:
+                    age = int(segment_value) if segment_value != "Non specificato" else None
+                    if age is None:
+                        segment_value = "Non specificato"
+                    elif respondent_type == "students":
+                        # Fasce specifiche per studenti (contesto scolastico)
+                        if age <= 16:
+                            segment_value = "14-16"
+                        elif age <= 18:
+                            segment_value = "17-18"
+                        elif age <= 20:
+                            segment_value = "19-20"
+                        elif age <= 25:
+                            segment_value = "21-25"
+                        elif age <= 30:
+                            segment_value = "26-30"
+                        else:
+                            segment_value = "30+"
+                    else:
+                        # Fasce per insegnanti (più ampie)
+                        if age < 25:
+                            segment_value = "<25"
+                        elif age < 35:
+                            segment_value = "25-34"
+                        elif age < 45:
+                            segment_value = "35-44"
+                        elif age < 55:
+                            segment_value = "45-54"
+                        else:
+                            segment_value = "55+"
+                except (ValueError, TypeError):
+                    segment_value = "Non specificato"
+            
+            # Normalizza valori per disciplina
+            if segment_by == "discipline_area":
+                segment_value_lower = str(segment_value).lower()
+                if respondent_type == "students":
+                    # Mappa study_path
+                    if segment_value and ("stem" in segment_value_lower or "scientifico" in segment_value_lower):
+                        segment_value = "STEM"
+                    elif segment_value and ("umanistico" in segment_value_lower or "classico" in segment_value_lower or "linguistico" in segment_value_lower):
+                        segment_value = "Umanistico"
+                    else:
+                        segment_value = "Altro"
+                else:
+                    # Mappa subject_area per insegnanti
+                    if segment_value and ("matematica" in segment_value_lower or "scienze" in segment_value_lower or "informatica" in segment_value_lower or "tecnologia" in segment_value_lower):
+                        segment_value = "STEM"
+                    elif segment_value and ("lettere" in segment_value_lower or "storia" in segment_value_lower or "filosofia" in segment_value_lower or "arte" in segment_value_lower or "lingue" in segment_value_lower):
+                        segment_value = "Umanistico"
+                    else:
+                        segment_value = "Altro"
+            
+            # Normalizza valori per school_level
+            if segment_by == "school_level":
+                segment_value_lower = str(segment_value).lower()
+                if "infanzia" in segment_value_lower:
+                    segment_value = "Infanzia"
+                elif "primaria" in segment_value_lower:
+                    segment_value = "Primaria"
+                elif "secondaria di primo grado" in segment_value_lower or "scuola media" in segment_value_lower:
+                    segment_value = "Secondaria I grado"
+                elif "secondaria di secondo grado" in segment_value_lower or "scuola superiore" in segment_value_lower:
+                    segment_value = "Secondaria II grado"
+                elif "università" in segment_value_lower or "universitaria" in segment_value_lower:
+                    segment_value = "Università"
+                elif "cpia" in segment_value_lower:
+                    segment_value = "CPIA"
+                elif "non insegno" in segment_value_lower or "assistente" in segment_value_lower:
+                    segment_value = "Altro"
+                else:
+                    segment_value = "Altro"
+            
+            # Normalizza valori per school_type (studenti)
+            if segment_by == "school_type":
+                segment_value_lower = str(segment_value).lower()
+                if "magistrale" in segment_value_lower or "ciclo unico" in segment_value_lower:
+                    segment_value = "Università Magistrale"
+                elif "triennale" in segment_value_lower:
+                    segment_value = "Università Triennale"
+                elif "secondaria di secondo grado" in segment_value_lower or "scuola superiore" in segment_value_lower:
+                    segment_value = "Scuola Secondaria II grado"
+                elif "secondaria di primo grado" in segment_value_lower or "scuola media" in segment_value_lower:
+                    segment_value = "Scuola Primaria/Media"
+                elif "primaria" in segment_value_lower:
+                    segment_value = "Scuola Primaria/Media"
+                elif "specializzazione" in segment_value_lower or "master" in segment_value_lower or "dottorato" in segment_value_lower:
+                    segment_value = "Post Laurea"
+                elif "disoccupato" in segment_value_lower:
+                    segment_value = "Altro"
+                else:
+                    segment_value = "Altro"
+            
+            # Aggiungi valore al segmento
+            if segment_value not in segments:
+                segments[segment_value] = []
+            segments[segment_value].append(float(value))
+        
+        # Calcola statistiche per ogni segmento (escludi segmenti con n=1)
+        segment_stats = []
+        all_segment_values = []  # Per test statistici
+        
+        for segment_name, values in segments.items():
+            if len(values) <= 1:  # Salta segmenti con n=0 o n=1 (non statisticamente significativi)
+                continue
+            
+            # Distribuzione
+            distribution = {}
+            for v in values:
+                v_int = int(round(v))
+                distribution[v_int] = distribution.get(v_int, 0) + 1
+            
+            # Moda (valore più frequente)
+            mode_value = max(distribution, key=distribution.get)
+            
+            # Quartili
+            sorted_values = sorted(values)
+            n = len(sorted_values)
+            q1 = sorted_values[n // 4] if n >= 4 else sorted_values[0]
+            q3 = sorted_values[3 * n // 4] if n >= 4 else sorted_values[-1]
+            
+            segment_stats.append({
+                'segment_name': str(segment_name),
+                'n': len(values),
+                'mean': round(statistics.mean(values), 2),
+                'median': round(statistics.median(values), 2),
+                'mode': mode_value,
+                'std_dev': round(statistics.stdev(values), 2) if len(values) > 1 else 0,
+                'min': round(min(values), 2),
+                'max': round(max(values), 2),
+                'q1': round(float(q1), 2),
+                'q3': round(float(q3), 2),
+                'distribution': distribution
+            })
+            
+            all_segment_values.append(values)
+        
+        # Ordina in base al tipo di segmentazione
+        if segment_by == "age_group":
+            # Per età, ordina cronologicamente
+            age_order = {
+                # Studenti
+                "14-16": 1, "17-18": 2, "19-20": 3, "21-25": 4, "26-30": 5, "30+": 6,
+                # Insegnanti
+                "<25": 1, "25-34": 2, "35-44": 3, "45-54": 4, "55+": 5,
+                # Fallback
+                "Non specificato": 99
+            }
+            segment_stats.sort(key=lambda x: age_order.get(x['segment_name'], 50))
+        elif segment_by == "school_type":
+            # Per tipo di scuola, ordina dal livello più basso al più alto
+            school_order = {
+                "Scuola Primaria/Media": 1,
+                "Scuola Secondaria II grado": 2,
+                "Università Triennale": 3,
+                "Università Magistrale": 4,
+                "Post Laurea": 5,
+                "Altro": 99
+            }
+            segment_stats.sort(key=lambda x: school_order.get(x['segment_name'], 50))
+        else:
+            # Per altri tipi di segmentazione, ordina per media decrescente
+            segment_stats.sort(key=lambda x: x['mean'], reverse=True)
+        
+        # Test statistici di significatività
+        statistical_significance = None
+        if len(all_segment_values) >= 2:  # Servono almeno 2 gruppi
+            try:
+                from scipy import stats
+                
+                # Kruskal-Wallis H-test (non parametrico per più gruppi)
+                h_statistic, p_value_kruskal = stats.kruskal(*all_segment_values)
+                
+                # Test ANOVA (parametrico, assumendo normalità)
+                f_statistic, p_value_anova = stats.f_oneway(*all_segment_values)
+                
+                # Determina significatività
+                # p < 0.001: altamente significativo
+                # p < 0.05: significativo
+                # p >= 0.05: non significativo
+                significance_level = "non significativo"
+                if p_value_kruskal < 0.001:
+                    significance_level = "altamente significativo (p < 0.001)"
+                elif p_value_kruskal < 0.05:
+                    significance_level = "significativo (p < 0.05)"
+                
+                statistical_significance = {
+                    'kruskal_wallis_h': round(float(h_statistic), 4),
+                    'kruskal_wallis_p': round(float(p_value_kruskal), 4),
+                    'anova_f': round(float(f_statistic), 4),
+                    'anova_p': round(float(p_value_anova), 4),
+                    'significance_level': significance_level,
+                    'is_significant': bool(p_value_kruskal < 0.05)
+                }
+            except ImportError:
+                # scipy non disponibile, salta i test
+                pass
+            except Exception as e:
+                # Errore nel calcolo, non bloccare la risposta
+                logging.warning(f"Errore nel calcolo significatività statistica: {e}")
+        
+        return {
+            'question_column': question_column,
+            'respondent_type': respondent_type,
+            'segment_by': segment_by,
+            'segments': segment_stats,
+            'total_responses': sum(s['n'] for s in segment_stats),
+            'statistical_significance': statistical_significance
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore nella segmentazione Likert: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

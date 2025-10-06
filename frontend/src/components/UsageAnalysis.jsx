@@ -17,6 +17,7 @@ import {
   ErrorBar
 } from 'recharts'
 import { Icons } from './Icons'
+import JSZip from 'jszip'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
 
@@ -56,6 +57,7 @@ function UsageAnalysis() {
   const [factorMetric, setFactorMetric] = useState('uso_quotidiano')
   const [influenceUsage, setInfluenceUsage] = useState('uso_quotidiano')
   const [influenceMetric, setInfluenceMetric] = useState(null)
+  const [downloading, setDownloading] = useState(false)
 
   // Stati per le modalità di visualizzazione dei grafici
   const [genderViewMode, setGenderViewMode] = useState('by-group')
@@ -66,6 +68,166 @@ function UsageAnalysis() {
   useEffect(() => {
     loadUsageData()
   }, [])
+
+  // Funzione helper per convertire SVG in PNG
+  const svgToPng = async (svgElement, width, height) => {
+    return new Promise((resolve, reject) => {
+      try {
+        // Clona l'SVG
+        const clonedSvg = svgElement.cloneNode(true)
+        clonedSvg.setAttribute('width', width)
+        clonedSvg.setAttribute('height', height)
+        clonedSvg.setAttribute('viewBox', `0 0 ${width} ${height}`)
+        
+        // Serializza
+        const svgData = new XMLSerializer().serializeToString(clonedSvg)
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+        const svgUrl = URL.createObjectURL(svgBlob)
+        
+        // Crea canvas
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        const scale = 2
+        canvas.width = width * scale
+        canvas.height = height * scale
+        
+        const img = new Image()
+        
+        img.onload = () => {
+          try {
+            // Sfondo bianco
+            ctx.fillStyle = 'white'
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
+            
+            // Disegna
+            ctx.scale(scale, scale)
+            ctx.drawImage(img, 0, 0, width, height)
+            
+            // Converti in blob
+            canvas.toBlob((blob) => {
+              URL.revokeObjectURL(svgUrl)
+              resolve(blob)
+            }, 'image/png')
+          } catch (err) {
+            URL.revokeObjectURL(svgUrl)
+            reject(err)
+          }
+        }
+        
+        img.onerror = (err) => {
+          URL.revokeObjectURL(svgUrl)
+          reject(err)
+        }
+        
+        img.src = svgUrl
+        
+        // Timeout
+        setTimeout(() => {
+          URL.revokeObjectURL(svgUrl)
+          reject(new Error('Timeout'))
+        }, 5000)
+      } catch (err) {
+        reject(err)
+      }
+    })
+  }
+
+  // Funzione per scaricare tutti i grafici della sezione overview in ZIP
+  const downloadAllCharts = async () => {
+    if (activeTab !== 'overview') return
+    
+    setDownloading(true)
+    const zip = new JSZip()
+    let chartCount = 0
+    
+    try {
+      // Trova tutte le sezioni con grafici
+      const sections = document.querySelectorAll('[data-chart-section]')
+      console.log(`Trovate ${sections.length} sezioni`)
+      
+      for (let i = 0; i < sections.length; i++) {
+        const section = sections[i]
+        const sectionName = section.getAttribute('data-chart-section')
+        
+        // Cerca il ResponsiveContainer con il grafico Recharts (esclude le cards)
+        const chartContainers = section.querySelectorAll('.recharts-responsive-container')
+        
+        if (chartContainers.length === 0) {
+          console.log(`Nessun grafico trovato in ${sectionName}`)
+          continue
+        }
+        
+        console.log(`Trovati ${chartContainers.length} grafici in ${sectionName}`)
+        
+        for (let j = 0; j < chartContainers.length; j++) {
+          const container = chartContainers[j]
+          
+          // Trova l'SVG dentro il container
+          const svg = container.querySelector('svg.recharts-surface')
+          
+          if (!svg) {
+            console.log(`SVG non trovato nel container ${j} di ${sectionName}`)
+            continue
+          }
+          
+          // Ottieni dimensioni reali
+          const bbox = svg.getBoundingClientRect()
+          const width = bbox.width || 800
+          const height = bbox.height || 400
+          
+          console.log(`Convertendo grafico ${sectionName} (${width}x${height})`)
+          
+          try {
+            // Converti SVG in PNG
+            const blob = await svgToPng(svg, width, height)
+            
+            if (blob) {
+              chartCount++
+              const fileNum = String(i + 1).padStart(2, '0')
+              const fileName = `${fileNum}-${sectionName}${chartContainers.length > 1 ? `-${j+1}` : ''}.png`
+              
+              // Aggiungi al ZIP
+              zip.file(fileName, blob)
+              console.log(`Aggiunto al ZIP: ${fileName}`)
+            }
+          } catch (err) {
+            console.error(`Errore conversione grafico ${sectionName}:`, err)
+          }
+          
+          // Pausa tra conversioni
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
+      }
+      
+      if (chartCount === 0) {
+        alert('Nessun grafico trovato da scaricare')
+        return
+      }
+      
+      console.log(`Generazione ZIP con ${chartCount} grafici...`)
+      
+      // Genera il file ZIP
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      
+      // Scarica il ZIP
+      const url = URL.createObjectURL(zipBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `grafici-utilizzo-panoramica-${new Date().toISOString().slice(0,10)}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      
+      console.log('Download completato!')
+      
+    } catch (error) {
+      console.error('Errore durante il download dei grafici:', error)
+      alert('Si è verificato un errore durante il download dei grafici')
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const loadUsageData = async () => {
     try {
@@ -201,7 +363,7 @@ function UsageAnalysis() {
       </div>
 
       {/* Content */}
-      {activeTab === 'overview' && renderOverview(data)}
+      {activeTab === 'overview' && renderOverview(data, downloadAllCharts, downloading)}
       {activeTab === 'time' && renderTimeAnalysis(data)}
       {activeTab === 'purposes' && renderPurposes(data)}
       {activeTab === 'factors' && renderFactors(data, factorTab, setFactorTab, factorMetric, setFactorMetric, metricOptions, {
@@ -225,7 +387,7 @@ function UsageAnalysis() {
 }
 
 // ========== SEZIONE PANORAMICA ==========
-function renderOverview(data) {
+function renderOverview(data, downloadAllCharts, downloading) {
   const overviewData = data.usage_overview || {
     students: { 
       total: 0, 
@@ -376,6 +538,32 @@ function renderOverview(data) {
 
   return (
     <div>
+      {/* Pulsante download tutti i grafici */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+        <button
+          onClick={downloadAllCharts}
+          disabled={downloading}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: downloading ? '#94a3b8' : '#6366f1',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: downloading ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '15px',
+            fontWeight: '600',
+            boxShadow: '0 2px 4px rgba(99, 102, 241, 0.3)',
+            transition: 'all 0.2s'
+          }}
+        >
+          <Icons.Download className="w-5 h-5" />
+          {downloading ? 'Download in corso...' : 'Scarica tutti i grafici'}
+        </button>
+      </div>
+
       {/* Introduzione */}
       <section style={{
         backgroundColor: '#f8fafc',
@@ -395,13 +583,15 @@ function renderOverview(data) {
       </section>
 
       {/* USO QUOTIDIANO */}
-      <section style={{
-        backgroundColor: 'white',
-        padding: '25px',
-        borderRadius: '12px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        marginBottom: '30px'
-      }}>
+      <section 
+        data-chart-section="utilizzo-quotidiano"
+        style={{
+          backgroundColor: 'white',
+          padding: '25px',
+          borderRadius: '12px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          marginBottom: '30px'
+        }}>
         <h3 style={{ marginBottom: '20px', color: '#334155', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icons.Clock className="w-5 h-5" />
           Uso Quotidiano dell'IA
@@ -461,35 +651,39 @@ function renderOverview(data) {
         </div>
 
         {/* Grafico Uso Quotidiano */}
-        <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={dailyUsageData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis label={{ value: 'Numero di rispondenti', angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="usano" name="Sì, uso quotidiano">
-              {dailyUsageData.map((entry, index) => (
-                <Cell key={`cell-yes-${index}`} fill={entry.colorYes} />
-              ))}
-            </Bar>
-            <Bar dataKey="nonUsano" name="No, non quotidiano">
-              {dailyUsageData.map((entry, index) => (
-                <Cell key={`cell-no-${index}`} fill={entry.colorNo} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        <div id="daily-usage-chart">
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={dailyUsageData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis label={{ value: 'Numero di rispondenti', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="usano" name="Sì, uso quotidiano">
+                {dailyUsageData.map((entry, index) => (
+                  <Cell key={`cell-yes-${index}`} fill={entry.colorYes} />
+                ))}
+              </Bar>
+              <Bar dataKey="nonUsano" name="No, non quotidiano">
+                {dailyUsageData.map((entry, index) => (
+                  <Cell key={`cell-no-${index}`} fill={entry.colorNo} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </section>
 
       {/* USO PER STUDIO/DIDATTICA */}
-      <section style={{
-        backgroundColor: 'white',
-        padding: '25px',
-        borderRadius: '12px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        marginBottom: '30px'
-      }}>
+      <section 
+        data-chart-section="studio-didattica"
+        style={{
+          backgroundColor: 'white',
+          padding: '25px',
+          borderRadius: '12px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          marginBottom: '30px'
+        }}>
         <h3 style={{ marginBottom: '20px', color: '#334155', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icons.Category className="w-5 h-5" />
           Uso per Studio/Didattica
@@ -549,8 +743,9 @@ function renderOverview(data) {
         </div>
 
         {/* Grafico Uso Studio/Didattica */}
-        <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={studyTeachingData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+        <div id="study-teaching-chart">
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={studyTeachingData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
             <YAxis label={{ value: 'Numero di rispondenti', angle: -90, position: 'insideLeft' }} />
@@ -566,18 +761,21 @@ function renderOverview(data) {
                 <Cell key={`cell-no-${index}`} fill={entry.colorNo} />
               ))}
             </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </section>
 
       {/* BOX PLOT ORE SETTIMANALI */}
-      <section style={{
-        backgroundColor: 'white',
-        padding: '25px',
-        borderRadius: '12px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        marginBottom: '25px'
-      }}>
+      <section 
+        data-chart-section="ore-settimanali"
+        style={{
+          backgroundColor: 'white',
+          padding: '25px',
+          borderRadius: '12px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          marginBottom: '25px'
+        }}>
         <h3 style={{ marginBottom: '20px', color: '#334155', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Icons.Stats className="w-5 h-5" />
           Distribuzione Ore Settimanali di Utilizzo

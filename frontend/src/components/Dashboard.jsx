@@ -291,10 +291,14 @@ function Dashboard({ data, onRefresh }) {
   return (
     <div className="dashboard">
       <header className="dashboard-header">
-        <h1>
-          <Icons.Chart className="w-8 h-8" />
-          Analisi Questionari AI - CNR
-        </h1>
+        <div className="dashboard-header-content">
+          <h1>
+            Rischi, opportunità e buone pratiche dell'utilizzo dell'intelligenza artificiale nell'educazione
+          </h1>
+          <p className="dashboard-header-subtitle">
+            Un'indagine empirica sul rapporto tra intelligenza artificiale ed educazione nel contesto italiano
+          </p>
+        </div>
       </header>
 
       <nav className="dashboard-nav">
@@ -1233,6 +1237,166 @@ function Dashboard({ data, onRefresh }) {
                 </section>
               </>
             )}
+
+            {/* Tabelle complete degli strumenti per categoria */}
+            <section className="chart-section" style={{ marginTop: '40px' }}>
+              <h2 style={{ marginBottom: '20px' }}>Lista completa degli strumenti AI utilizzati</h2>
+              <p style={{ color: '#64748b', marginBottom: '30px' }}>
+                Elenco dettagliato di tutti gli strumenti AI dichiarati, suddivisi per categoria di rispondenti con il numero di occorrenze
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '30px' }}>
+                {/* Tabella Studenti */}
+                <div style={{ backgroundColor: '#eff6ff', padding: '20px', borderRadius: '12px', border: '2px solid #3b82f6' }}>
+                  <h3 style={{ color: '#3b82f6', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Icons.Student className="w-5 h-5" />
+                    Studenti
+                  </h3>
+                  <div style={{ maxHeight: '600px', overflow: 'auto', backgroundColor: 'white', borderRadius: '8px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                      <thead style={{ backgroundColor: '#dbeafe', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #3b82f6', fontWeight: '600' }}>Strumento</th>
+                          <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #3b82f6', fontWeight: '600', width: '80px' }}>N°</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(tools.student_tools || {})
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([tool, count], idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #e0f2fe' }}>
+                              <td style={{ padding: '10px 12px', color: '#1e293b' }}>{tool}</td>
+                              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', color: '#3b82f6' }}>{count}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginTop: '12px', fontSize: '0.85rem', color: '#64748b', textAlign: 'right' }}>
+                    Totale strumenti unici: <strong>{Object.keys(tools.student_tools || {}).length}</strong>
+                  </div>
+                </div>
+
+                {/* Tabella Docenti in Servizio */}
+                <div style={{ backgroundColor: '#f0fdf4', padding: '20px', borderRadius: '12px', border: '2px solid #10b981' }}>
+                  <h3 style={{ color: '#10b981', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Icons.Teacher className="w-5 h-5" />
+                    Docenti in Servizio
+                  </h3>
+                  <div style={{ maxHeight: '600px', overflow: 'auto', backgroundColor: 'white', borderRadius: '8px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                      <thead style={{ backgroundColor: '#d1fae5', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #10b981', fontWeight: '600' }}>Strumento</th>
+                          <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #10b981', fontWeight: '600', width: '80px' }}>N°</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(tools.teacher_tools_active || {})
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([tool, count], idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #d1fae5' }}>
+                              <td style={{ padding: '10px 12px', color: '#1e293b' }}>{tool}</td>
+                              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', color: '#10b981' }}>{count}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginTop: '12px', fontSize: '0.85rem', color: '#64748b', textAlign: 'right' }}>
+                    Totale strumenti unici: <strong>{Object.keys(tools.teacher_tools_active || {}).length}</strong>
+                  </div>
+                </div>
+
+                {/* Tabella Docenti Non in Servizio */}
+                <div style={{ backgroundColor: '#fef3c7', padding: '20px', borderRadius: '12px', border: '2px solid #f59e0b' }}>
+                  <h3 style={{ color: '#f59e0b', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Icons.Teacher className="w-5 h-5" />
+                    Docenti Non in Servizio
+                  </h3>
+                  <div style={{ maxHeight: '600px', overflow: 'auto', backgroundColor: 'white', borderRadius: '8px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                      <thead style={{ backgroundColor: '#fde68a', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #f59e0b', fontWeight: '600' }}>Strumento</th>
+                          <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #f59e0b', fontWeight: '600', width: '80px' }}>N°</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(tools.teacher_tools_training || {})
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([tool, count], idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #fde68a' }}>
+                              <td style={{ padding: '10px 12px', color: '#1e293b' }}>{tool}</td>
+                              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', color: '#f59e0b' }}>{count}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginTop: '12px', fontSize: '0.85rem', color: '#64748b', textAlign: 'right' }}>
+                    Totale strumenti unici: <strong>{Object.keys(tools.teacher_tools_training || {}).length}</strong>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Analisi discorsiva conclusiva */}
+            <section className="chart-section" style={{ marginTop: '40px' }}>
+              <div style={{
+                backgroundColor: '#f0f9ff',
+                border: '2px solid #3b82f6',
+                borderRadius: '12px',
+                padding: '2rem',
+                lineHeight: '1.8'
+              }}>
+                <h3 style={{
+                  fontSize: '1.3rem',
+                  marginBottom: '1.5rem',
+                  color: '#1e40af',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <Icons.Info className="w-6 h-6" />
+                  Analisi del panorama degli strumenti AI nell'educazione italiana
+                </h3>
+
+                <div style={{ color: '#475569', fontSize: '1rem' }}>
+                  <p style={{ marginBottom: '1.2rem' }}>
+                    L'indagine rivela un <strong>panorama eterogeneo e fortemente differenziato</strong> nell'adozione degli strumenti di intelligenza artificiale tra i diversi attori del sistema educativo italiano. Emerge chiaramente come l'integrazione dell'IA nel contesto scolastico e universitario sia ancora in una fase iniziale e disomogenea, con significative disparità tra studenti e corpo docente.
+                  </p>
+
+                  <p style={{ marginBottom: '1.2rem' }}>
+                    Tra gli <strong>studenti</strong>, l'adozione degli strumenti AI è decisamente più marcata: circa il <strong>75% degli studenti intervistati (203 su 272)</strong> dichiara di utilizzare almeno uno strumento di intelligenza artificiale. La media di strumenti utilizzati si attesta a <strong>1.94 per studente</strong>, con una distribuzione che vede quasi la metà del campione (47.3%) concentrarsi sull'uso di un singolo strumento, mentre circa un quarto ne utilizza due. Solo una piccola percentuale (3%) arriva ad utilizzare cinque o più strumenti diversi, configurando una sorta di "élite tecnologica" studentesca che esplora attivamente le diverse possibilità offerte dall'intelligenza artificiale generativa.
+                  </p>
+
+                  <p style={{ marginBottom: '1.2rem' }}>
+                    Il quadro cambia drasticamente quando si analizza il <strong>corpo docente in servizio</strong>. Solo il <strong>45% dei docenti attualmente insegnanti (161 su 358)</strong> dichiara di utilizzare strumenti AI, evidenziando un <strong>divario critico</strong> che solleva interrogativi profondi sulla preparazione del sistema educativo italiano all'integrazione dell'intelligenza artificiale. La media di strumenti utilizzati dai docenti in servizio è sostanzialmente equivalente a quella studentesca (<strong>1.92 strumenti</strong>), ma la percentuale di non utilizzo risulta preoccupante: più della metà dei docenti (55%) non fa uso di alcuno strumento AI, suggerendo barriere significative di natura formativa, culturale o infrastrutturale. Ancora più marcato è il fenomeno tra i <strong>docenti non in servizio</strong>, dove solo il <strong>28% (28 su 99)</strong> dichiara un utilizzo attivo, con una media ancora inferiore di <strong>1.64 strumenti</strong>.
+                  </p>
+
+                  <p style={{ marginBottom: '1.2rem' }}>
+                    Dal punto di vista della <strong>concentrazione degli strumenti</strong>, il mercato appare dominato da pochi attori. <strong>ChatGPT</strong>, nelle sue diverse versioni (3.5, 4 e 4o), emerge come lo strumento preponderante in assoluto, utilizzato trasversalmente da studenti e docenti. Seguono <strong>Gemini</strong> di Google, che si configura come principale alternativa, e una serie di strumenti specialistici utilizzati in nicchie specifiche: <strong>Quillbot</strong> per la scrittura e la parafrasi, <strong>MidJourney</strong> e <strong>Leonardo</strong> per la generazione di immagini, <strong>Claude</strong> come chatbot conversazionale alternativo, e <strong>Perplexity</strong> per attività di ricerca avanzata. Questo pattern di concentrazione su pochi strumenti mainstream riflette sia la potenza e accessibilità di queste piattaforme, sia una potenziale mancanza di consapevolezza rispetto alla varietà di strumenti AI disponibili per scopi educativi specifici.
+                  </p>
+
+                  <p style={{ marginBottom: '1.2rem' }}>
+                    Analizzando la <strong>tipologia degli strumenti utilizzati</strong>, emerge che sia studenti che docenti convergono sui medesimi strumenti generalisti (ChatGPT, Gemini, Claude), senza una netta differenziazione tra usi creativi e didattici. Entrambi i gruppi utilizzano in misura simile <strong>strumenti per la generazione di immagini</strong> (MidJourney, Leonardo, Dall-E, Canva) e <strong>assistenti per la scrittura</strong> (Quillbot, Copilot). Tra i docenti si osservano sporadiche menzioni di <strong>strumenti specificamente didattici</strong> (Geogebra, Kahoot, Edpuzzle, MagicSchool, NotebookLM), ma queste rappresentano una minoranza rispetto all'uso massivo di chatbot generalisti. Questa sovrapposizione suggerisce che l'intelligenza artificiale viene prevalentemente utilizzata per scopi trasversali e generici, indipendentemente dal ruolo educativo, e che non si è ancora sviluppata una consapevolezza diffusa dell'esistenza di strumenti AI specificamente progettati per esigenze didattiche e pedagogiche. La mancanza di differenziazione riflette probabilmente sia una limitata conoscenza delle alternative specializzate, sia la tendenza a rimanere fedeli agli strumenti più pubblicizzati e accessibili, piuttosto che esplorare soluzioni mirate alle specifiche esigenze del contesto educativo.
+                  </p>
+
+                  <p style={{ marginBottom: '1.2rem' }}>
+                    Un fenomeno particolarmente significativo che emerge dai dati è quello della <strong>fidelizzazione e dell'uso monostrumentale</strong>. La stragrande maggioranza degli utenti, sia studenti che docenti, si concentra su un singolo strumento AI, prevalentemente ChatGPT, instaurando una sorta di <strong>dipendenza esclusiva da un'unica piattaforma</strong>. Questo comportamento monostrumentale, sebbene comprensibile dal punto di vista della semplicità d'uso e della curva di apprendimento, presenta <strong>rischi significativi</strong> dal punto di vista pedagogico e critico. Gli utenti che si affidano esclusivamente a un singolo strumento AI tendono a sviluppare una <strong>visione limitata delle potenzialità e dei limiti</strong> dell'intelligenza artificiale, spesso adottando in modo acritico le risposte fornite senza interrogarsi sulle alternative, sui bias intrinseci dello strumento, o sulle diverse modalità di ragionamento che altri modelli potrebbero offrire. Questa fidelizzazione rischia inoltre di creare una <strong>dipendenza da specifici ecosistemi commerciali</strong>, con implicazioni sia economiche che di sovranità tecnologica, oltre a limitare lo sviluppo di competenze trasversali nell'utilizzo di strumenti AI diversificati.
+                  </p>
+
+                  <p style={{ marginBottom: '1.2rem' }}>
+                    L'uso monostrumentale porta con sé anche il rischio di una <strong>standardizzazione del pensiero e della produzione intellettuale</strong>. Quando un'intera generazione di studenti e una significativa porzione di docenti si affidano allo stesso strumento per generare contenuti, rispondere a domande, e supportare processi creativi, si corre il pericolo che le risposte, gli stili di scrittura, e persino le strutture argomentative convergano verso modelli omogenei, riducendo la diversità di pensiero e l'originalità delle produzioni accademiche. Questa omogeneizzazione è ulteriormente aggravata dal fatto che molti utenti non sviluppano la capacità di <strong>confrontare criticamente</strong> le risposte di diversi modelli AI, perdendo così l'opportunità di affinare il proprio giudizio critico attraverso la comparazione e la valutazione di prospettive diverse. La mancanza di familiarità con strumenti alternativi impedisce inoltre di comprendere che ogni modello AI è addestrato su dataset diversi, con bias specifici e limitazioni proprie, e che solo attraverso l'utilizzo consapevole e comparato di più strumenti è possibile ottenere una visione più completa e affidabile.
+                  </p>
+
+                  <p style={{ marginBottom: '0' }}>
+                    Le <strong>implicazioni</strong> di questi dati sono profonde e multidimensionali. Il divario nell'adozione tra studenti e docenti rischia di creare una <strong>asimmetria informativa e competenziale</strong> che potrebbe minare l'efficacia dell'insegnamento e la capacità del sistema educativo di guidare gli studenti verso un uso consapevole, critico ed etico dell'intelligenza artificiale. La scarsa diffusione dell'IA tra i docenti evidenzia la necessità urgente di <strong>programmi di formazione strutturati, accessibili e mirati</strong>, che non si limitino a insegnare l'uso tecnico di un singolo strumento, ma sviluppino anche una comprensione pedagogica delle potenzialità e dei limiti dell'intelligenza artificiale, promuovendo un approccio <strong>pluralistico e comparativo</strong> nell'utilizzo di diverse piattaforme. È fondamentale educare sia studenti che docenti alla <strong>diversificazione degli strumenti</strong> e alla <strong>valutazione critica</strong> delle loro risposte, stimolando l'adozione di pratiche di verifica incrociata e l'esplorazione di alternative. Senza un'adeguata preparazione del corpo docente e una cultura della diversificazione tecnologica, si corre il rischio che l'IA venga percepita come una minaccia piuttosto che come un'opportunità, ampliando ulteriormente il distacco tra insegnanti e studenti, compromettendo la qualità dell'esperienza formativa, e creando una generazione di utenti tecnologicamente dipendenti ma criticamente impreparati.
+                  </p>
+                </div>
+              </div>
+            </section>
           </div>
         )}
       </main>

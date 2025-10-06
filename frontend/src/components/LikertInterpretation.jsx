@@ -213,50 +213,6 @@ function LikertInterpretation() {
           </p>
       </Section>
 
-      <Section id="boxplot" title="Leggere i box plot: cosa ci dicono sulla variabilità" icon={Icons.Chart}>
-          <h4>Elementi del box plot</h4>
-          <p>
-            I grafici a scatola (box plot) visualizzati nella sezione grafici mostrano la distribuzione completa
-            delle risposte, non solo la media. Ogni box plot contiene:
-          </p>
-          <ul style={{ marginLeft: '2rem', lineHeight: '1.8' }}>
-            <li><strong>Q1 (primo quartile)</strong>: il 25% delle risposte sta sotto questo valore</li>
-            <li><strong>Q3 (terzo quartile)</strong>: il 75% delle risposte sta sotto questo valore</li>
-            <li><strong>Mediana (linea tratteggiata spessa nel box)</strong>: il valore centrale, divide a metà le risposte</li>
-            <li><strong>Media (punto rosso)</strong>: la media aritmetica, influenzata dai valori estremi</li>
-            <li><strong>Baffi (whiskers)</strong>: estensione fino ai valori minimi e massimi</li>
-          </ul>
-
-          <h4>Cosa rivela l'altezza del box?</h4>
-          <p>
-            L'<strong>altezza del box</strong> (distanza Q3-Q1) indica la <em>dispersione</em> delle risposte:
-          </p>
-          <ul style={{ marginLeft: '2rem', lineHeight: '1.8' }}>
-            <li><strong>Box stretto</strong>: consenso elevato, risposte concentrate</li>
-            <li><strong>Box alto</strong>: opinioni molto diverse, alta variabilità</li>
-          </ul>
-          <p>
-            Per esempio, se la formazione sull'IA ha un box molto alto, significa che mentre alcuni la trovano
-            adeguata, altri la trovano completamente inadeguata - non c'è consenso. Se invece la fiducia
-            nell'integrazione dell'IA ha un box stretto con mediana alta, significa che la maggioranza concorda
-            sul fatto di essere abbastanza fiduciosa.
-          </p>
-
-          <h4>Media vs mediana: quando divergono</h4>
-          <p>
-            Quando il <strong>punto rosso (media) è lontano dalla linea tratteggiata (mediana)</strong>, significa
-            che ci sono valori estremi che "tirano" la media in una direzione:
-          </p>
-          <ul style={{ marginLeft: '2rem', lineHeight: '1.8' }}>
-            <li>Media &gt; Mediana: ci sono alcuni valori molto alti che alzano la media</li>
-            <li>Media &lt; Mediana: ci sono alcuni valori molto bassi che abbassano la media</li>
-          </ul>
-          <p>
-            In questi casi, la <strong>mediana è più rappresentativa</strong> del "valore tipico" della popolazione,
-            perché non è influenzata dagli outlier.
-          </p>
-      </Section>
-
       <Section id="sintesi" title="Sintesi e implicazioni" icon={Icons.Lightbulb}>
           <h4>Il quadro emergente</h4>
           <p>

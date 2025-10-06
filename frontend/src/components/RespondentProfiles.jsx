@@ -1806,16 +1806,17 @@ function RespondentProfiles() {
         )}
 
         {/* Tipo di Materia: STEM vs Umanistica (solo per insegnanti) */}
-        {(category === 'teachers_active' || category === 'teachers_training') && profileData.subject_type && (
+        {(category === 'teachers_active' || category === 'teachers_training' || category === 'teachers_total') && profileData.stem && (
           <div style={{ marginBottom: '30px' }}>
             <h4 style={{ color: '#475569', marginBottom: '15px' }}>Tipo di materia: STEM vs umanistica</h4>
             {(() => {
-              const subjectTypeData = Object.entries(profileData.subject_type.distribution || {})
+              const stemField = category === 'teachers_total' ? 'stem' : 'subject_type'
+              const subjectTypeData = Object.entries(profileData[stemField]?.distribution || {})
                 .map(([name, value]) => ({
                   name: name.includes('STEM') ? 'STEM' : 'Umanistica',
                   fullName: name,
                   value,
-                  percentage: ((value / profileData.subject_type.total) * 100).toFixed(1)
+                  percentage: ((value / profileData[stemField]?.total) * 100).toFixed(1)
                 }))
               
               const SUBJECT_COLORS = {
@@ -1896,11 +1897,12 @@ function RespondentProfiles() {
 
             {/* Tabella STEM vs Umanistica */}
             {(() => {
-              const subjectTypeData = Object.entries(profileData.subject_type.distribution || {})
+              const stemField = category === 'teachers_total' ? 'stem' : 'subject_type'
+              const subjectTypeData = Object.entries(profileData[stemField]?.distribution || {})
                 .map(([name, value]) => ({
                   name: name,
                   value,
-                  percentage: ((value / profileData.subject_type.total) * 100).toFixed(1)
+                  percentage: ((value / profileData[stemField]?.total) * 100).toFixed(1)
                 }))
               
               return (
