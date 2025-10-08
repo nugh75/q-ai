@@ -277,7 +277,9 @@ function LLMAdminPanel() {
               padding: '0.75rem',
               border: '2px solid #e2e8f0',
               borderRadius: '8px',
-              fontSize: '1rem'
+              fontSize: '1rem',
+              backgroundColor: '#ffffff',
+              color: '#1e293b'
             }}
           >
             <option value="ollama">Ollama (locale)</option>
@@ -385,7 +387,9 @@ function LLMAdminPanel() {
                 padding: '0.75rem',
                 border: '2px solid #e2e8f0',
                 borderRadius: '8px',
-                fontSize: '1rem'
+                fontSize: '1rem',
+                backgroundColor: '#ffffff',
+                color: '#1e293b'
               }}
               placeholder={
                 provider === 'ollama' ? 'llama3.2' :
