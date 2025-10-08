@@ -1,0 +1,447 @@
+import { useState, useEffect } from 'react'
+import { Icons } from './Icons'
+import './Dashboard.css'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
+
+function QualitativeAnalysis() {
+  const [questions, setQuestions] = useState([])
+  const [selectedQuestion, setSelectedQuestion] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [results, setResults] = useState(null)
+  const [savedTaxonomies, setSavedTaxonomies] = useState([])
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    loadAvailableQuestions()
+    loadSavedTaxonomies()
+  }, [])
+
+  const loadAvailableQuestions = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`${API_URL}/api/qualitative-analysis/available-questions`)
+      const data = await response.json()
+      setQuestions(data.questions)
+    } catch (err) {
+      console.error('Errore caricamento domande:', err)
+      setError('Errore caricamento domande aperte')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadSavedTaxonomies = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/qualitative-analysis/taxonomies`)
+      const data = await response.json()
+      setSavedTaxonomies(data.taxonomies)
+    } catch (err) {
+      console.error('Errore caricamento tassonomie:', err)
+    }
+  }
+
+  const analyzeQuestion = async () => {
+    if (!selectedQuestion) return
+
+    try {
+      setAnalyzing(true)
+      setError(null)
+      setResults(null)
+
+      const response = await fetch(`${API_URL}/api/qualitative-analysis/analyze-question`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          field_key: selectedQuestion.field_key,
+          respondent_type: selectedQuestion.respondent_type,
+          max_categories: 10
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Errore analisi')
+      }
+
+      const data = await response.json()
+      setResults(data)
+      loadSavedTaxonomies() // Ricarica lista
+    } catch (err) {
+      console.error('Errore analisi:', err)
+      setError(err.message)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const loadTaxonomy = async (taxonomyId) => {
+    try {
+      setLoading(true)
+      const response = await fetch(`${API_URL}/api/qualitative-analysis/taxonomy/${taxonomyId}`)
+      const data = await response.json()
+      setResults(data)
+      
+      // Trova domanda corrispondente
+      const question = questions.find(
+        q => q.field_key === data.field_key && q.respondent_type === data.respondent_type
+      )
+      if (question) setSelectedQuestion(question)
+    } catch (err) {
+      console.error('Errore caricamento tassonomia:', err)
+      setError('Errore caricamento tassonomia salvata')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getRespondentLabel = (type) => {
+    const labels = {
+      'students': 'Studenti',
+      'teachers_active': 'Insegnanti in Servizio',
+      'teachers_training': 'Insegnanti Non in Servizio'
+    }
+    return labels[type] || type
+  }
+
+  if (loading && questions.length === 0) {
+    return <div className="loading">Caricamento analisi qualitativa...</div>
+  }
+
+  return (
+    <div style={{ padding: '2rem' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.8rem', color: '#1e293b', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Icons.FileText className="w-6 h-6" />
+          Analisi Qualitativa - Risposte Aperte
+        </h2>
+        <p style={{ fontSize: '0.95rem', color: '#64748b' }}>
+          Analisi semantica con clustering e tassonomia automatica tramite LLM
+        </p>
+      </div>
+
+      {/* Selezione domanda */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        padding: '1.5rem',
+        borderRadius: '12px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        marginBottom: '2rem'
+      }}>
+        <h3 style={{ fontSize: '1.1rem', color: '#1e293b', marginBottom: '1rem' }}>
+          1. Seleziona Domanda Aperta da Analizzare
+        </h3>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#475569', fontSize: '0.9rem' }}>
+            Domanda
+          </label>
+          <select
+            value={selectedQuestion ? JSON.stringify({ field_key: selectedQuestion.field_key, respondent_type: selectedQuestion.respondent_type }) : ''}
+            onChange={(e) => {
+              if (!e.target.value) {
+                setSelectedQuestion(null)
+                setResults(null)
+                return
+              }
+              const { field_key, respondent_type } = JSON.parse(e.target.value)
+              const q = questions.find(q => q.field_key === field_key && q.respondent_type === respondent_type)
+              setSelectedQuestion(q)
+              setResults(null)
+            }}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              border: '2px solid #e2e8f0',
+              borderRadius: '8px',
+              fontSize: '0.95rem'
+            }}
+          >
+            <option value="">-- Seleziona una domanda --</option>
+            {questions.map((q, idx) => (
+              <option key={idx} value={JSON.stringify({ field_key: q.field_key, respondent_type: q.respondent_type })}>
+                [{getRespondentLabel(q.respondent_type)}] {q.question_text} ({q.n_responses} risposte)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedQuestion && !results && (
+          <div style={{
+            marginTop: '1.5rem',
+            padding: '1rem',
+            backgroundColor: '#f1f5f9',
+            borderRadius: '8px',
+            borderLeft: '4px solid #8b5cf6'
+          }}>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <strong style={{ color: '#475569', fontSize: '0.9rem' }}>Domanda selezionata:</strong>
+              <p style={{ color: '#1e293b', marginTop: '0.25rem', fontSize: '0.95rem' }}>
+                {selectedQuestion.question_text}
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: '#64748b' }}>
+              <span>📊 <strong>{selectedQuestion.n_responses}</strong> risposte disponibili</span>
+              <span>👥 <strong>{getRespondentLabel(selectedQuestion.respondent_type)}</strong></span>
+            </div>
+            
+            <button
+              onClick={analyzeQuestion}
+              disabled={analyzing}
+              style={{
+                marginTop: '1rem',
+                padding: '0.75rem 1.5rem',
+                backgroundColor: analyzing ? '#94a3b8' : '#8b5cf6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: analyzing ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                width: '100%',
+                justifyContent: 'center'
+              }}
+            >
+              {analyzing ? (
+                <>
+                  <span className="spinner" style={{ width: '16px', height: '16px' }}></span>
+                  Analisi in corso... (può richiedere 30-60 secondi)
+                </>
+              ) : (
+                <>
+                  <Icons.Play className="w-5 h-5" />
+                  Avvia Analisi Qualitativa
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Tassonomie salvate */}
+        {savedTaxonomies.length > 0 && (
+          <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '2px solid #e2e8f0' }}>
+            <h4 style={{ fontSize: '0.95rem', color: '#64748b', marginBottom: '0.75rem' }}>
+              Oppure carica un'analisi già eseguita:
+            </h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {savedTaxonomies.slice(0, 10).map(tax => (
+                <button
+                  key={tax.id}
+                  onClick={() => loadTaxonomy(tax.id)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#f1f5f9',
+                    border: '2px solid #cbd5e1',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    color: '#475569',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {tax.field_key} - {getRespondentLabel(tax.respondent_type)} ({tax.n_responses})
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Errori */}
+      {error && (
+        <div style={{
+          padding: '1rem',
+          backgroundColor: '#fee2e2',
+          border: '2px solid #ef4444',
+          borderRadius: '8px',
+          color: '#991b1b',
+          marginBottom: '2rem'
+        }}>
+          <strong>Errore:</strong> {error}
+          {error.includes('configurazione LLM') && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+              → Vai su <strong>Amministrazione</strong> per configurare l'LLM
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Risultati */}
+      {results && (
+        <div>
+          {/* Tassonomia */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ fontSize: '1.3rem', color: '#1e293b', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Icons.Tags className="w-6 h-6" />
+              Tassonomia Generata ({results.taxonomy.length} categorie)
+            </h3>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1rem' }}>
+              {results.taxonomy.map((cat, idx) => (
+                <div key={idx} style={{
+                  padding: '1.25rem',
+                  backgroundColor: '#f8fafc',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.75rem' }}>
+                    {cat.name}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '0.75rem', lineHeight: '1.5' }}>
+                    {cat.definition}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    <strong>Keywords:</strong> {cat.keywords.join(', ')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Statistiche Categorie */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ fontSize: '1.3rem', color: '#1e293b', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Icons.Chart className="w-6 h-6" />
+              Distribuzione Categorie
+            </h3>
+
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              {results.summary.category_counts.map((cat, idx) => (
+                <div key={idx} style={{
+                  display: 'grid',
+                  gridTemplateColumns: '200px 1fr 100px',
+                  alignItems: 'center',
+                  gap: '1rem'
+                }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#1e293b' }}>
+                    {cat.category}
+                  </div>
+                  <div style={{ position: 'relative', height: '30px', backgroundColor: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      height: '100%',
+                      width: `${cat.percentage}%`,
+                      backgroundColor: '#8b5cf6',
+                      transition: 'width 0.3s'
+                    }}></div>
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '0.5rem',
+                      transform: 'translateY(-50%)',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      color: cat.percentage > 30 ? 'white' : '#1e293b'
+                    }}>
+                      {cat.n_questions} risposte
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: '600', color: '#8b5cf6', textAlign: 'right' }}>
+                    {cat.percentage}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Co-occorrenze */}
+          {results.summary.cooccurrence && results.summary.cooccurrence.length > 0 && (
+            <div style={{
+              backgroundColor: '#ffffff',
+              padding: '1.5rem',
+              borderRadius: '12px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              marginBottom: '2rem'
+            }}>
+              <h3 style={{ fontSize: '1.3rem', color: '#1e293b', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Icons.TrendingUp className="w-6 h-6" />
+                Co-occorrenze Principali
+              </h3>
+
+              <div style={{ display: 'grid', gap: '0.5rem' }}>
+                {results.summary.cooccurrence.map((co, idx) => (
+                  <div key={idx} style={{
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{ fontSize: '0.9rem', color: '#475569' }}>
+                      <strong>{co.cat_i}</strong> <span style={{ color: '#94a3b8' }}>←→</span> <strong>{co.cat_j}</strong>
+                    </div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#8b5cf6' }}>
+                      {co.n} volte ({co.percentage}%)
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Esempi Top */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}>
+            <h3 style={{ fontSize: '1.3rem', color: '#1e293b', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Icons.Star className="w-6 h-6" />
+              Risposte più Rappresentative
+            </h3>
+
+            {Object.entries(results.summary.top_examples).map(([category, examples], catIdx) => (
+              examples.length > 0 && (
+                <div key={catIdx} style={{ marginBottom: '2rem' }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: '600', color: '#8b5cf6', marginBottom: '1rem' }}>
+                    {category}
+                  </h4>
+                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    {examples.map((ex, exIdx) => (
+                      <div key={exIdx} style={{
+                        padding: '1rem',
+                        backgroundColor: '#faf5ff',
+                        border: '2px solid #e9d5ff',
+                        borderRadius: '8px'
+                      }}>
+                        <div style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '0.5rem', lineHeight: '1.5' }}>
+                          "{ex.text}"
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#94a3b8' }}>
+                          <span>Codice: {ex.code}</span>
+                          <span>Confidence: {ex.confidence}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default QualitativeAnalysis

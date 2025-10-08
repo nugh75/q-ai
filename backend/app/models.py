@@ -120,3 +120,59 @@ class Question(Base):
     field_name = Column(String)  # Nome del campo nel modello
     is_required = Column(String)  # 'yes' o 'no'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class LLMConfig(Base):
+    """Configurazione LLM per analisi qualitativa"""
+    __tablename__ = "llm_config"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    provider = Column(String, nullable=False)  # 'ollama', 'gemini', 'openai'
+    endpoint = Column(String)  # URL endpoint (per Ollama)
+    api_key = Column(String)  # API key (per Gemini/OpenAI)
+    model_name = Column(String, nullable=False)  # Nome modello
+    is_active = Column(Integer, default=1)  # 1=attivo, 0=inattivo
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class QualitativePrompt(Base):
+    """Prompt personalizzati per analisi qualitativa"""
+    __tablename__ = "qualitative_prompts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    template_key = Column(String, nullable=False, unique=True)  # 'sentiment', 'thematic', etc.
+    template_name = Column(String, nullable=False)  # Nome visualizzato
+    description = Column(Text)  # Descrizione template
+    system_prompt = Column(Text, nullable=False)  # System prompt
+    user_prompt_template = Column(Text, nullable=False)  # User prompt template
+    is_active = Column(Integer, default=1)  # 1=attivo, 0=inattivo
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class QualitativeTaxonomy(Base):
+    """Tassonomia generata per analisi qualitativa"""
+    __tablename__ = "qualitative_taxonomies"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    question_field = Column(String, nullable=False)  # 'learning_improvement', 'difficulties', etc.
+    respondent_type = Column(String, nullable=False)  # 'student', 'teacher_active', 'teacher_training'
+    taxonomy_data = Column(JSON, nullable=False)  # Array di categorie con definizioni
+    n_clusters = Column(Integer)
+    n_responses = Column(Integer)
+    quality_score = Column(Float)  # Silhouette score o metrica simile
+    narrative_report = Column(Text, nullable=True)  # NUOVO: Report discorsivo generato dall'AI
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class QualitativeAnnotation(Base):
+    """Annotazioni multi-label per risposte aperte"""
+    __tablename__ = "qualitative_annotations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    taxonomy_id = Column(Integer, nullable=False)  # FK a QualitativeTaxonomy
+    respondent_code = Column(String, nullable=False)  # Codice anonimo
+    response_text = Column(Text, nullable=False)
+    labels = Column(JSON, nullable=False)  # Array di {category, confidence, relevant_phrase}
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

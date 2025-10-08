@@ -2,11 +2,12 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from .database import engine, get_db, Base
-from .models import StudentResponse, TeacherResponse, Question
+from .models import StudentResponse, TeacherResponse, Question, LLMConfig, QualitativeTaxonomy, QualitativeAnnotation, QualitativePrompt
 from .excel_parser import ExcelParser
 from .analytics import Analytics
 from .question_classifier import QuestionClassifier
 from .question_stats_service import QuestionStatsService
+from .qualitative_service import QualitativeAnalysisService
 from .cache import cache
 from .statistics import InferentialStats, CorrelationAnalysis, RegressionAnalysis, calculate_mean_with_ci
 from typing import Optional, List, Dict, Any
@@ -75,15 +76,15 @@ app = FastAPI(
 )
 
 # CORS - Configurazione sicura
-allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:5180,http://localhost:5173").split(",")
+allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:5180,http://localhost:5173,https://ai-q-2.ai4educ.org").split(",")
 allowed_origins = [origin.strip() for origin in allowed_origins]  # Remove whitespace
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 @app.get("/")
@@ -3010,6 +3011,952 @@ def get_likert_segmentation(
         raise
     except Exception as e:
         logger.error(f"Errore nella segmentazione Likert: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# QUALITATIVE ANALYSIS ENDPOINTS
+# ============================================================================
+
+ADMIN_PASSWORD = "Lagom192."
+
+@app.get("/api/admin/llm-config")
+def get_llm_config(password: str, db: Session = Depends(get_db)):
+    """Ottieni configurazione LLM attiva (richiede password)"""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=403, detail="Password non valida")
+    
+    try:
+        config = db.query(LLMConfig).filter(LLMConfig.is_active == 1).first()
+        
+        if not config:
+            return {
+                "configured": False,
+                "message": "Nessuna configurazione LLM attiva"
+            }
+        
+        return {
+            "configured": True,
+            "provider": config.provider,
+            "endpoint": config.endpoint,
+            "model_name": config.model_name,
+            "has_api_key": bool(config.api_key)
+        }
+    
+    except Exception as e:
+        logger.error(f"Errore get LLM config: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/admin/llm-config")
+def set_llm_config(config_data: dict, db: Session = Depends(get_db)):
+    """Imposta configurazione LLM (richiede password)"""
+    if config_data.get('password') != ADMIN_PASSWORD:
+        raise HTTPException(status_code=403, detail="Password non valida")
+    
+    try:
+        provider = config_data.get('provider')
+        endpoint = config_data.get('endpoint', '')
+        api_key = config_data.get('api_key', '')
+        model_name = config_data.get('model_name')
+        
+        if not provider or not model_name:
+            raise HTTPException(status_code=400, detail="Provider e model_name sono obbligatori")
+        
+        # Validazione provider
+        if provider not in ['ollama', 'gemini', 'openai']:
+            raise HTTPException(status_code=400, detail="Provider deve essere: ollama, gemini, openai")
+        
+        # Disattiva tutte le config esistenti
+        db.query(LLMConfig).update({"is_active": 0})
+        
+        # Crea nuova config attiva
+        new_config = LLMConfig(
+            provider=provider,
+            endpoint=endpoint,
+            api_key=api_key,
+            model_name=model_name,
+            is_active=1
+        )
+        
+        db.add(new_config)
+        db.commit()
+        db.refresh(new_config)
+        
+        logger.info(f"Configurazione LLM aggiornata: {provider} - {model_name}")
+        
+        return {
+            "success": True,
+            "message": f"Configurazione LLM salvata: {provider} - {model_name}",
+            "config": {
+                "id": new_config.id,
+                "provider": new_config.provider,
+                "model_name": new_config.model_name,
+                "endpoint": new_config.endpoint if provider == 'ollama' else None
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Errore set LLM config: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/admin/ollama-models")
+def get_ollama_models(endpoint: str, password: str):
+    """Ottiene lista modelli disponibili da Ollama"""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=403, detail="Password non valida")
+    
+    try:
+        models = QualitativeAnalysisService.get_ollama_models(endpoint)
+        return {
+            "success": True,
+            "models": models,
+            "count": len(models)
+        }
+    except Exception as e:
+        logger.error(f"Errore get Ollama models: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/qualitative-analysis/templates")
+def get_analysis_templates(db: Session = Depends(get_db)):
+    """Ottieni lista template di analisi disponibili (default + personalizzati)"""
+    try:
+        from .qualitative_templates import get_all_templates
+        
+        # Template di default
+        default_templates = get_all_templates()
+        
+        # Template personalizzati dal database
+        custom_prompts = db.query(QualitativePrompt).filter(
+            QualitativePrompt.is_active == 1
+        ).all()
+        
+        # Merge template (custom sovrascrive default se stesso key)
+        templates_dict = {t['key']: t for t in default_templates}
+        
+        for prompt in custom_prompts:
+            templates_dict[prompt.template_key] = {
+                'key': prompt.template_key,
+                'name': prompt.template_name,
+                'description': prompt.description,
+                'default_max_categories': 8,
+                'suggested_categories': [],
+                'is_custom': True,
+                'id': prompt.id
+            }
+        
+        templates = list(templates_dict.values())
+        
+        return {
+            'templates': templates,
+            'total': len(templates)
+        }
+    except Exception as e:
+        logger.error(f"Errore get templates: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/admin/qualitative-prompts")
+def get_qualitative_prompts(password: str, db: Session = Depends(get_db)):
+    """Ottieni tutti i prompt personalizzati (admin)"""
+    if password != "Lagom192.":
+        raise HTTPException(status_code=403, detail="Password non valida")
+    
+    try:
+        from .qualitative_templates import ANALYSIS_TEMPLATES
+        
+        # Prompt di default
+        default_prompts = []
+        for key, template in ANALYSIS_TEMPLATES.items():
+            default_prompts.append({
+                'template_key': key,
+                'template_name': template['name'],
+                'description': template['description'],
+                'system_prompt': template['system_prompt'],
+                'user_prompt_template': template['user_prompt_template'],
+                'is_default': True
+            })
+        
+        # Prompt personalizzati
+        custom_prompts = db.query(QualitativePrompt).all()
+        custom_list = []
+        for prompt in custom_prompts:
+            custom_list.append({
+                'id': prompt.id,
+                'template_key': prompt.template_key,
+                'template_name': prompt.template_name,
+                'description': prompt.description,
+                'system_prompt': prompt.system_prompt,
+                'user_prompt_template': prompt.user_prompt_template,
+                'is_active': prompt.is_active == 1,
+                'is_default': False
+            })
+        
+        return {
+            'default_prompts': default_prompts,
+            'custom_prompts': custom_list
+        }
+    except Exception as e:
+        logger.error(f"Errore get prompts: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/admin/qualitative-prompts")
+def save_qualitative_prompt(request_data: dict, db: Session = Depends(get_db)):
+    """Salva o aggiorna un prompt personalizzato (admin)"""
+    password = request_data.get('password')
+    if password != "Lagom192.":
+        raise HTTPException(status_code=403, detail="Password non valida")
+    
+    try:
+        prompt_id = request_data.get('id')
+        
+        if prompt_id:
+            # Aggiorna esistente
+            prompt = db.query(QualitativePrompt).filter(
+                QualitativePrompt.id == prompt_id
+            ).first()
+            
+            if not prompt:
+                raise HTTPException(status_code=404, detail="Prompt non trovato")
+            
+            prompt.template_key = request_data.get('template_key', prompt.template_key)
+            prompt.template_name = request_data.get('template_name', prompt.template_name)
+            prompt.description = request_data.get('description', prompt.description)
+            prompt.system_prompt = request_data.get('system_prompt', prompt.system_prompt)
+            prompt.user_prompt_template = request_data.get('user_prompt_template', prompt.user_prompt_template)
+            prompt.is_active = 1 if request_data.get('is_active', True) else 0
+        else:
+            # Crea nuovo
+            prompt = QualitativePrompt(
+                template_key=request_data['template_key'],
+                template_name=request_data['template_name'],
+                description=request_data.get('description', ''),
+                system_prompt=request_data['system_prompt'],
+                user_prompt_template=request_data['user_prompt_template'],
+                is_active=1 if request_data.get('is_active', True) else 0
+            )
+            db.add(prompt)
+        
+        db.commit()
+        db.refresh(prompt)
+        
+        return {
+            'success': True,
+            'prompt': {
+                'id': prompt.id,
+                'template_key': prompt.template_key,
+                'template_name': prompt.template_name
+            }
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Errore save prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/admin/qualitative-prompts/{prompt_id}")
+def delete_qualitative_prompt(prompt_id: int, password: str, db: Session = Depends(get_db)):
+    """Elimina un prompt personalizzato (admin)"""
+    if password != "Lagom192.":
+        raise HTTPException(status_code=403, detail="Password non valida")
+    
+    try:
+        prompt = db.query(QualitativePrompt).filter(
+            QualitativePrompt.id == prompt_id
+        ).first()
+        
+        if not prompt:
+            raise HTTPException(status_code=404, detail="Prompt non trovato")
+        
+        db.delete(prompt)
+        db.commit()
+        
+        return {'success': True}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Errore delete prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/qualitative-analysis/available-questions")
+def get_available_open_questions(db: Session = Depends(get_db)):
+    """Ottieni lista domande aperte disponibili con conteggi"""
+    try:
+        # Mappa domande aperte
+        open_questions_map = {
+            'students': {
+                'preferred_tools_why': 'Perché preferisci questi strumenti IA?',
+                'personalization_examples': 'Esempi di personalizzazione apprendimento',
+                'prompt_examples': 'Esempi di prompt utilizzati',
+                'learning_improvement': 'Come l\'IA ha migliorato l\'apprendimento',
+                'specific_examples': 'Esempi specifici di utilizzo IA',
+                'difficulties': 'Difficoltà incontrate',
+                'why_not_use': 'Perché non usi l\'IA',
+                'pros_cons': 'Pro e contro dell\'IA',
+                'not_recommended': 'Cosa non consiglieresti'
+            },
+            'teachers': {
+                'preferred_tools_why': 'Perché preferisci questi strumenti IA?',
+                'individualization': 'Individualizzazione insegnamento con IA',
+                'personalization': 'Personalizzazione insegnamento',
+                'prompt_examples': 'Esempi di prompt utilizzati',
+                'learning_improvement': 'Come l\'IA ha migliorato insegnamento',
+                'specific_examples': 'Esempi specifici utilizzo IA',
+                'difficulties': 'Difficoltà incontrate',
+                'why_not_use': 'Perché non usi l\'IA',
+                'pros_cons': 'Pro e contro dell\'IA',
+                'not_recommended': 'Cosa non consiglieresti'
+            }
+        }
+        
+        # Conta risposte disponibili
+        questions_stats = []
+        
+        # Studenti
+        students = db.query(StudentResponse).all()
+        for field_key, question_text in open_questions_map['students'].items():
+            count = sum(1 for s in students 
+                       if s.open_responses 
+                       and isinstance(s.open_responses, dict) 
+                       and s.open_responses.get(field_key)
+                       and str(s.open_responses[field_key]).strip()
+                       and str(s.open_responses[field_key]).strip() not in ['-', 'null', 'None'])
+            
+            if count > 0:
+                questions_stats.append({
+                    'field_key': field_key,
+                    'question_text': question_text,
+                    'respondent_type': 'students',
+                    'n_responses': count,
+                    'percentage': round(count / len(students) * 100, 1) if students else 0
+                })
+        
+        # Insegnanti attivi
+        teachers_active = db.query(TeacherResponse).filter(
+            TeacherResponse.currently_teaching == 'Attualmente insegno.'
+        ).all()
+        
+        for field_key, question_text in open_questions_map['teachers'].items():
+            count = sum(1 for t in teachers_active
+                       if t.open_responses
+                       and isinstance(t.open_responses, dict)
+                       and t.open_responses.get(field_key)
+                       and str(t.open_responses[field_key]).strip()
+                       and str(t.open_responses[field_key]).strip() not in ['-', 'null', 'None'])
+            
+            if count > 0:
+                questions_stats.append({
+                    'field_key': field_key,
+                    'question_text': question_text,
+                    'respondent_type': 'teachers_active',
+                    'n_responses': count,
+                    'percentage': round(count / len(teachers_active) * 100, 1) if teachers_active else 0
+                })
+        
+        # Insegnanti in formazione
+        teachers_training = db.query(TeacherResponse).filter(
+            TeacherResponse.currently_teaching != 'Attualmente insegno.'
+        ).all()
+        
+        for field_key, question_text in open_questions_map['teachers'].items():
+            count = sum(1 for t in teachers_training
+                       if t.open_responses
+                       and isinstance(t.open_responses, dict)
+                       and t.open_responses.get(field_key)
+                       and str(t.open_responses[field_key]).strip()
+                       and str(t.open_responses[field_key]).strip() not in ['-', 'null', 'None'])
+            
+            if count > 0:
+                questions_stats.append({
+                    'field_key': field_key,
+                    'question_text': question_text,
+                    'respondent_type': 'teachers_training',
+                    'n_responses': count,
+                    'percentage': round(count / len(teachers_training) * 100, 1) if teachers_training else 0
+                })
+        
+        # Ordina per numero risposte
+        questions_stats.sort(key=lambda x: x['n_responses'], reverse=True)
+        
+        return {
+            'questions': questions_stats,
+            'total_questions': len(questions_stats),
+            'total_respondents': {
+                'students': len(students),
+                'teachers_active': len(teachers_active),
+                'teachers_training': len(teachers_training)
+            }
+        }
+    
+    except Exception as e:
+        logger.error(f"Errore get available open questions: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/qualitative-analysis/generate-taxonomy")
+def generate_taxonomy(request_data: dict, db: Session = Depends(get_db)):
+    """
+    FASE 1: Genera tassonomia da risposte aperte
+    L'utente potrà poi modificare/approvare la tassonomia prima della classificazione
+    """
+    try:
+        from .qualitative_service import QualitativeAnalysisService
+        
+        field_key = request_data.get('field_key')
+        respondent_type = request_data.get('respondent_type')
+        max_categories = request_data.get('max_categories', 8)
+        template_name = request_data.get('template', 'custom')  # Nuovo parametro template
+        
+        if not field_key or not respondent_type:
+            raise HTTPException(status_code=400, detail="field_key e respondent_type sono obbligatori")
+        
+        # Inizializza servizio
+        service = QualitativeAnalysisService(db)
+        
+        # Verifica configurazione LLM
+        if not service.llm_config:
+            raise HTTPException(
+                status_code=400, 
+                detail="Nessuna configurazione LLM attiva. Configura l'LLM in Amministrazione."
+            )
+        
+        # Estrai risposte
+        if respondent_type == 'students':
+            respondents = db.query(StudentResponse).all()
+        elif respondent_type == 'teachers_active':
+            respondents = db.query(TeacherResponse).filter(
+                TeacherResponse.currently_teaching == 'Attualmente insegno.'
+            ).all()
+        elif respondent_type == 'teachers_training':
+            respondents = db.query(TeacherResponse).filter(
+                TeacherResponse.currently_teaching != 'Attualmente insegno.'
+            ).all()
+        else:
+            raise HTTPException(status_code=400, detail="respondent_type non valido")
+        
+        # Filtra risposte valide
+        responses_data = []
+        for resp in respondents:
+            if resp.open_responses and isinstance(resp.open_responses, dict):
+                text = resp.open_responses.get(field_key)
+                if text and str(text).strip() and str(text).strip() not in ['-', 'null', 'None']:
+                    responses_data.append({
+                        'code': resp.code,
+                        'text': str(text).strip()
+                    })
+        
+        if len(responses_data) < 10:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Risposte insufficienti: {len(responses_data)}. Minimo richiesto: 10"
+            )
+        
+        logger.info(f"Generazione tassonomia: {field_key} - {respondent_type} - {len(responses_data)} risposte - template: {template_name}")
+        
+        # FASE 1: Genera tassonomia (usa solo prime 50 risposte per velocità)
+        responses_texts = [r['text'] for r in responses_data]
+        taxonomy_result = service.generate_taxonomy(responses_texts, field_key, max_categories, template_name)
+        taxonomy = taxonomy_result['taxonomy']
+        
+        logger.info(f"Tassonomia generata: {len(taxonomy)} categorie")
+        
+        return {
+            'success': True,
+            'field_key': field_key,
+            'respondent_type': respondent_type,
+            'n_responses': len(responses_data),
+            'taxonomy': taxonomy,
+            'sample_responses': responses_texts[:10]  # Prime 10 per mostrare all'utente
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore generazione tassonomia: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/qualitative-analysis/classify-responses")
+def classify_responses(request_data: dict, db: Session = Depends(get_db)):
+    """
+    FASE 2: Classifica risposte usando tassonomia approvata
+    Processa in batch di 30 risposte alla volta
+    """
+    try:
+        from .qualitative_service import QualitativeAnalysisService
+        
+        field_key = request_data.get('field_key')
+        respondent_type = request_data.get('respondent_type')
+        taxonomy = request_data.get('taxonomy')  # Tassonomia modificata/approvata dall'utente
+        batch_size = request_data.get('batch_size', 30)
+        start_index = request_data.get('start_index', 0)
+        
+        if not field_key or not respondent_type or not taxonomy:
+            raise HTTPException(status_code=400, detail="field_key, respondent_type e taxonomy sono obbligatori")
+        
+        # Inizializza servizio
+        service = QualitativeAnalysisService(db)
+        
+        # Verifica configurazione LLM
+        if not service.llm_config:
+            raise HTTPException(
+                status_code=400, 
+                detail="Nessuna configurazione LLM attiva. Configura l'LLM in Amministrazione."
+            )
+        
+        # Estrai risposte
+        if respondent_type == 'students':
+            respondents = db.query(StudentResponse).all()
+        elif respondent_type == 'teachers_active':
+            respondents = db.query(TeacherResponse).filter(
+                TeacherResponse.currently_teaching == 'Attualmente insegno.'
+            ).all()
+        elif respondent_type == 'teachers_training':
+            respondents = db.query(TeacherResponse).filter(
+                TeacherResponse.currently_teaching != 'Attualmente insegno.'
+            ).all()
+        else:
+            raise HTTPException(status_code=400, detail="respondent_type non valido")
+        
+        # Filtra risposte valide
+        responses_data = []
+        for resp in respondents:
+            if resp.open_responses and isinstance(resp.open_responses, dict):
+                text = resp.open_responses.get(field_key)
+                if text and str(text).strip() and str(text).strip() not in ['-', 'null', 'None']:
+                    responses_data.append({
+                        'code': resp.code,
+                        'text': str(text).strip()
+                    })
+        
+        # Crea/recupera tassonomia nel DB (se è il primo batch)
+        if start_index == 0:
+            taxonomy_record = QualitativeTaxonomy(
+                question_field=field_key,
+                respondent_type=respondent_type,
+                taxonomy_data=taxonomy,
+                n_clusters=len(taxonomy),
+                n_responses=len(responses_data),
+                quality_score=0.0
+            )
+            db.add(taxonomy_record)
+            db.commit()
+            db.refresh(taxonomy_record)
+            taxonomy_id = taxonomy_record.id
+        else:
+            # Recupera l'ultima tassonomia creata per questa combinazione
+            taxonomy_record = db.query(QualitativeTaxonomy).filter(
+                QualitativeTaxonomy.question_field == field_key,
+                QualitativeTaxonomy.respondent_type == respondent_type
+            ).order_by(QualitativeTaxonomy.created_at.desc()).first()
+            
+            if not taxonomy_record:
+                raise HTTPException(status_code=400, detail="Tassonomia non trovata, ricomincia da start_index=0")
+            
+            taxonomy_id = taxonomy_record.id
+        
+        # Prendi batch di risposte
+        batch_responses = responses_data[start_index:start_index + batch_size]
+        
+        logger.info(f"Classificazione batch {start_index}-{start_index+len(batch_responses)}/{len(responses_data)}")
+        
+        # FASE 2: Classifica il batch
+        annotations = []
+        for i, resp_data in enumerate(batch_responses):
+            logger.info(f"Classificazione {start_index + i + 1}/{len(responses_data)}: {resp_data['code']}")
+            
+            labels = service.classify_response(resp_data['text'], taxonomy)
+            
+            # Salva annotazione
+            annotation = QualitativeAnnotation(
+                taxonomy_id=taxonomy_id,
+                respondent_code=resp_data['code'],
+                response_text=resp_data['text'],
+                labels=labels
+            )
+            db.add(annotation)
+            annotations.append({
+                'code': resp_data['code'],
+                'labels': labels
+            })
+        
+        db.commit()
+        logger.info(f"Classificate {len(annotations)} risposte del batch")
+        
+        # Calcola progresso
+        total_classified = start_index + len(batch_responses)
+        is_complete = total_classified >= len(responses_data)
+        
+        # Se completato, calcola statistiche finali
+        summary = None
+        if is_complete:
+            logger.info("Classificazione completata, calcolo statistiche...")
+            
+            # Recupera tutte le annotazioni
+            all_annotations = db.query(QualitativeAnnotation).filter(
+                QualitativeAnnotation.taxonomy_id == taxonomy_id
+            ).all()
+            
+            # Co-occorrenze
+            cooccurrence = service.calculate_cooccurrence(all_annotations)
+            
+            # Conta risposte per categoria
+            from collections import Counter
+            category_counts = Counter()
+            for ann in all_annotations:
+                for label in ann.labels:
+                    if label.get('confidence', 0) > 0.5:
+                        category_counts[label['category']] += 1
+            
+            category_stats = [
+                {
+                    'category': cat['name'],
+                    'n_questions': category_counts.get(cat['name'], 0),
+                    'percentage': round(category_counts.get(cat['name'], 0) / len(all_annotations) * 100, 1)
+                }
+                for cat in taxonomy
+            ]
+            category_stats.sort(key=lambda x: x['n_questions'], reverse=True)
+            
+            # Top esempi (tutti)
+            top_examples = service.get_top_examples(all_annotations, taxonomy, top_n=999)
+            
+            summary = {
+                'category_counts': category_stats,
+                'cooccurrence': cooccurrence[:15],
+                'top_examples': top_examples
+            }
+        
+        return {
+            'success': True,
+            'taxonomy_id': taxonomy_id,
+            'batch_start': start_index,
+            'batch_size': len(batch_responses),
+            'total_responses': len(responses_data),
+            'total_classified': total_classified,
+            'is_complete': is_complete,
+            'progress_percentage': round((total_classified / len(responses_data)) * 100, 1),
+            'annotations': annotations,
+            'summary': summary
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Errore classificazione risposte: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/qualitative-analysis/taxonomies")
+def get_saved_taxonomies(db: Session = Depends(get_db)):
+    """Ottieni lista tassonomie salvate (filtra automaticamente quelle senza risultati)"""
+    try:
+        taxonomies = db.query(QualitativeTaxonomy).order_by(
+            QualitativeTaxonomy.created_at.desc()
+        ).all()
+        
+        # Filtra tassonomie che hanno almeno una annotazione con categorie assegnate
+        valid_taxonomies = []
+        for tax in taxonomies:
+            # Conta annotazioni con almeno una label
+            annotations_with_labels = db.query(QualitativeAnnotation).filter(
+                QualitativeAnnotation.taxonomy_id == tax.id
+            ).all()
+            
+            has_classifications = False
+            for ann in annotations_with_labels:
+                if ann.labels and len(ann.labels) > 0:
+                    has_classifications = True
+                    break
+            
+            # Include solo tassonomie con almeno una classificazione
+            if has_classifications:
+                # Estrai TUTTE le categorie (non solo prime 4)
+                top_categories = [cat['name'] for cat in tax.taxonomy_data] if tax.taxonomy_data else []
+                
+                valid_taxonomies.append({
+                    'id': tax.id,
+                    'field_key': tax.question_field,
+                    'respondent_type': tax.respondent_type,
+                    'n_clusters': tax.n_clusters,
+                    'n_responses': tax.n_responses,
+                    'quality_score': tax.quality_score,
+                    'created_at': str(tax.created_at),
+                    'top_categories': top_categories,  # TUTTE le categorie
+                    'total_categories': len(tax.taxonomy_data) if tax.taxonomy_data else 0
+                })
+        
+        return {
+            'taxonomies': valid_taxonomies,
+            'total': len(valid_taxonomies)
+        }
+    
+    except Exception as e:
+        logger.error(f"Errore get taxonomies: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/qualitative-analysis/taxonomy/{taxonomy_id}")
+def get_taxonomy_detail(taxonomy_id: int, db: Session = Depends(get_db)):
+    """Ottieni dettagli completi di una tassonomia salvata"""
+    try:
+        taxonomy = db.query(QualitativeTaxonomy).filter(
+            QualitativeTaxonomy.id == taxonomy_id
+        ).first()
+        
+        if not taxonomy:
+            raise HTTPException(status_code=404, detail="Tassonomia non trovata")
+        
+        # Ottieni annotazioni
+        annotations = db.query(QualitativeAnnotation).filter(
+            QualitativeAnnotation.taxonomy_id == taxonomy_id
+        ).all()
+        
+        # Ricalcola statistiche
+        from .qualitative_service import QualitativeAnalysisService
+        service = QualitativeAnalysisService(db)
+        
+        cooccurrence = service.calculate_cooccurrence(annotations)
+        top_examples = service.get_top_examples(annotations, taxonomy.taxonomy_data, top_n=999)
+        
+        # Conta per categoria
+        from collections import Counter
+        category_counts = Counter()
+        for ann in annotations:
+            for label in ann.labels:
+                if label.get('confidence', 0) > 0.5:
+                    category_counts[label['category']] += 1
+        
+        # Prepara statistiche categorie con descrizioni complete
+        category_stats = []
+        for cat in taxonomy.taxonomy_data:
+            cat_name = cat['name']
+            count = category_counts.get(cat_name, 0)
+            
+            category_stats.append({
+                'category': cat_name,
+                'description': cat.get('description', ''),
+                'keywords': cat.get('keywords', []),
+                'n_questions': count,
+                'percentage': round(count / len(annotations) * 100, 1) if annotations else 0,
+                # Aggiungi esempi per questa categoria
+                'examples': top_examples.get(cat_name, [])
+            })
+        
+        category_stats.sort(key=lambda x: x['n_questions'], reverse=True)
+        
+        # Formatta co-occorrenze con descrizioni più chiare
+        formatted_cooccurrence = []
+        for co in cooccurrence[:15]:
+            formatted_cooccurrence.append({
+                'categories': f"{co['cat_i']} + {co['cat_j']}",
+                'cat_i': co['cat_i'],
+                'cat_j': co['cat_j'],
+                'count': co['n'],
+                'description': f"Le categorie '{co['cat_i']}' e '{co['cat_j']}' compaiono insieme {co['n']} volte ({co['percentage']}%)"
+            })
+        
+        return {
+            'id': taxonomy.id,
+            'field_key': taxonomy.question_field,
+            'respondent_type': taxonomy.respondent_type,
+            'n_responses': taxonomy.n_responses,
+            'taxonomy': taxonomy.taxonomy_data,
+            'narrative_report': taxonomy.narrative_report,  # NUOVO: Include report se disponibile
+            'summary': {
+                'category_counts': category_stats,
+                'cooccurrence': formatted_cooccurrence,
+                'total_annotations': len(annotations)
+            },
+            'created_at': str(taxonomy.created_at)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore get taxonomy detail: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/qualitative-analysis/taxonomy/{taxonomy_id}/generate-report")
+def generate_narrative_report(taxonomy_id: int, db: Session = Depends(get_db)):
+    """Genera report narrativo discorsivo con citazioni per una tassonomia"""
+    try:
+        # Ottieni tassonomia
+        taxonomy = db.query(QualitativeTaxonomy).filter(
+            QualitativeTaxonomy.id == taxonomy_id
+        ).first()
+        
+        if not taxonomy:
+            raise HTTPException(status_code=404, detail="Tassonomia non trovata")
+        
+        # Se esiste già un report, restituiscilo
+        if taxonomy.narrative_report:
+            logger.info(f"Report già esistente per taxonomy {taxonomy_id}")
+            return {
+                'taxonomy_id': taxonomy_id,
+                'report': taxonomy.narrative_report,
+                'cached': True
+            }
+        
+        # Ottieni annotazioni
+        annotations = db.query(QualitativeAnnotation).filter(
+            QualitativeAnnotation.taxonomy_id == taxonomy_id
+        ).all()
+        
+        if not annotations:
+            raise HTTPException(status_code=400, detail="Nessuna annotazione disponibile per questa tassonomia")
+        
+        # Genera report con LLM
+        from .qualitative_service import QualitativeAnalysisService
+        service = QualitativeAnalysisService(db)
+        
+        # Mappa field_key a testo domanda leggibile
+        question_texts = {
+            'pros_cons': 'Quali sono i PRO e i CONTRO dell\'utilizzo dell\'intelligenza artificiale nella didattica?',
+            'suggestions': 'Quali suggerimenti daresti per un utilizzo efficace dell\'intelligenza artificiale nell\'educazione?',
+            'practices': 'Quali pratiche e strumenti di intelligenza artificiale utilizzi o conosci?',
+            'concerns': 'Quali sono le tue principali preoccupazioni riguardo l\'intelligenza artificiale nell\'educazione?',
+            'benefits': 'Quali benefici hai riscontrato o prevedi dall\'uso dell\'intelligenza artificiale?',
+            'challenges': 'Quali sfide hai incontrato nell\'implementazione dell\'intelligenza artificiale?',
+            'learning_improvement': 'Cosa si potrebbe migliorare per facilitare l\'apprendimento?',
+            'difficulties': 'Quali difficoltà hai incontrato?'
+        }
+        
+        question_text = question_texts.get(taxonomy.question_field, taxonomy.question_field)
+        
+        logger.info(f"Generazione report narrativo per taxonomy {taxonomy_id}...")
+        report_text = service.generate_narrative_report(
+            taxonomy=taxonomy.taxonomy_data,
+            annotations=annotations,
+            question_text=question_text
+        )
+        
+        # Salva report nel database
+        taxonomy.narrative_report = report_text
+        db.commit()
+        
+        logger.info(f"Report generato e salvato: {len(report_text)} caratteri")
+        
+        return {
+            'taxonomy_id': taxonomy_id,
+            'report': report_text,
+            'cached': False
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore generazione report: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/qualitative-analysis/taxonomy/{taxonomy_id}")
+def delete_taxonomy(taxonomy_id: int, password: str, db: Session = Depends(get_db)):
+    """Elimina una specifica tassonomia con tutte le sue annotazioni"""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Password amministratore non corretta")
+    
+    try:
+        # Verifica esistenza tassonomia
+        taxonomy = db.query(QualitativeTaxonomy).filter(
+            QualitativeTaxonomy.id == taxonomy_id
+        ).first()
+        
+        if not taxonomy:
+            raise HTTPException(status_code=404, detail="Tassonomia non trovata")
+        
+        # Elimina tutte le annotazioni associate
+        deleted_annotations = db.query(QualitativeAnnotation).filter(
+            QualitativeAnnotation.taxonomy_id == taxonomy_id
+        ).delete()
+        
+        # Elimina la tassonomia
+        db.query(QualitativeTaxonomy).filter(
+            QualitativeTaxonomy.id == taxonomy_id
+        ).delete()
+        
+        db.commit()
+        
+        logger.info(f"Eliminata tassonomia {taxonomy_id} con {deleted_annotations} annotazioni")
+        
+        return {
+            'success': True,
+            'deleted_taxonomy_id': taxonomy_id,
+            'deleted_annotations': deleted_annotations,
+            'message': f'Tassonomia eliminata con successo ({deleted_annotations} annotazioni rimosse)'
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore eliminazione tassonomia: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/qualitative-analysis/cleanup-empty")
+def cleanup_empty_taxonomies(password: str, db: Session = Depends(get_db)):
+    """Elimina tassonomie senza risultati di classificazione"""
+    if password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Password non corretta")
+    
+    try:
+        taxonomies = db.query(QualitativeTaxonomy).all()
+        
+        taxonomies_to_delete = []
+        for tax in taxonomies:
+            # Verifica se ci sono annotazioni con almeno una label
+            annotations = db.query(QualitativeAnnotation).filter(
+                QualitativeAnnotation.taxonomy_id == tax.id
+            ).all()
+            
+            has_classifications = False
+            for ann in annotations:
+                if ann.labels and len(ann.labels) > 0:
+                    has_classifications = True
+                    break
+            
+            # Se non ha classificazioni, marca per eliminazione
+            if not has_classifications:
+                taxonomies_to_delete.append(tax.id)
+        
+        # Elimina annotazioni e tassonomie vuote
+        deleted_annotations = 0
+        deleted_taxonomies = 0
+        
+        for tax_id in taxonomies_to_delete:
+            # Elimina annotazioni associate
+            n_ann = db.query(QualitativeAnnotation).filter(
+                QualitativeAnnotation.taxonomy_id == tax_id
+            ).delete()
+            deleted_annotations += n_ann
+            
+            # Elimina tassonomia
+            db.query(QualitativeTaxonomy).filter(
+                QualitativeTaxonomy.id == tax_id
+            ).delete()
+            deleted_taxonomies += 1
+        
+        db.commit()
+        
+        return {
+            'message': 'Pulizia completata',
+            'deleted_taxonomies': deleted_taxonomies,
+            'deleted_annotations': deleted_annotations,
+            'taxonomy_ids': taxonomies_to_delete
+        }
+    
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Errore cleanup empty taxonomies: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

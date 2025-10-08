@@ -10,6 +10,9 @@ import CorrelationAnalysis from './CorrelationAnalysis'
 import LikertAnalysis from './LikertAnalysis'
 import DocumentLayout, { Section } from './DocumentLayout'
 import ToolWordCloud from './ToolWordCloud'
+import QualitativeAnalysis from './QualitativeAnalysis'
+import LLMAdminPanel from './LLMAdminPanel'
+import PromptAdminPanel from './PromptAdminPanel'
 import './Dashboard.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8118'
@@ -337,6 +340,18 @@ function Dashboard({ data, onRefresh }) {
         <button className={activeTab === 'correlations' ? 'active' : ''} onClick={() => setActiveTab('correlations')}>
           <Icons.TrendingUp className="w-5 h-5" />
           Correlazioni
+        </button>
+        <button className={activeTab === 'qualitative' ? 'active' : ''} onClick={() => setActiveTab('qualitative')}>
+          <Icons.FileText className="w-5 h-5" />
+          Analisi Qualitativa
+        </button>
+        <button className={activeTab === 'admin' ? 'active' : ''} onClick={() => setActiveTab('admin')}>
+          <Icons.Settings className="w-5 h-5" />
+          Config LLM
+        </button>
+        <button className={activeTab === 'prompts' ? 'active' : ''} onClick={() => setActiveTab('prompts')}>
+          <Icons.Edit className="w-5 h-5" />
+          Prompt Editor
         </button>
       </nav>
 
@@ -1398,6 +1413,18 @@ function Dashboard({ data, onRefresh }) {
               </div>
             </section>
           </div>
+        )}
+
+        {activeTab === 'qualitative' && (
+          <QualitativeAnalysis />
+        )}
+
+        {activeTab === 'admin' && (
+          <LLMAdminPanel />
+        )}
+
+        {activeTab === 'prompts' && (
+          <PromptAdminPanel />
         )}
       </main>
     </div>
