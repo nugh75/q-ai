@@ -10,7 +10,8 @@ export default defineConfig({
     allowedHosts: [
       'localhost',
       'ai-q-2.ai4educ.org',
-      '.ai4educ.org'  // Permette tutti i sottodomini di ai4educ.org
+      '.ai4educ.org',
+      '192.168.129.14'
     ]
   }
 })

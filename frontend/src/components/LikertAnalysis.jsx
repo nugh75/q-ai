@@ -458,62 +458,6 @@ function LikertAnalysis() {
                 </div>
 
                 <div style={{ padding: '1.5rem', backgroundColor: '#ffffff' }}>
-                  {/* Statistiche riassuntive in alto */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-                    {activeQ && (
-                      <div style={{
-                        padding: '1rem',
-                        backgroundColor: RESPONDENT_COLORS.teachers_active + '15',
-                        borderRadius: '8px',
-                        border: `2px solid ${RESPONDENT_COLORS.teachers_active}40`
-                      }}>
-                        <div style={{ fontWeight: '600', color: RESPONDENT_COLORS.teachers_active, marginBottom: '0.75rem', fontSize: '0.95rem' }}>
-                          📊 Insegnanti in Servizio (n={activeQ.stats.total_responses})
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
-                            <span style={{ color: '#64748b' }}>Media:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_active }}>{activeQ.stats.mean}</strong>
-                          </div>
-                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
-                            <span style={{ color: '#64748b' }}>Mediana:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_active }}>{activeQ.stats.median}</strong>
-                          </div>
-                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
-                            <span style={{ color: '#64748b' }}>Moda:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_active }}>{activeQ.stats.mode}</strong>
-                          </div>
-                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
-                            <span style={{ color: '#64748b' }}>Dev. Std:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_active }}>{activeQ.stats.std_dev}</strong>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {trainingQ && (
-                      <div style={{
-                        padding: '1rem',
-                        backgroundColor: RESPONDENT_COLORS.teachers_training + '15',
-                        borderRadius: '8px',
-                        border: `2px solid ${RESPONDENT_COLORS.teachers_training}40`
-                      }}>
-                        <div style={{ fontWeight: '600', color: RESPONDENT_COLORS.teachers_training, marginBottom: '0.75rem', fontSize: '0.95rem' }}>
-                          📚 Insegnanti Non in Servizio (n={trainingQ.stats.total_responses})
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
-                            <span style={{ color: '#64748b' }}>Media:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_training }}>{trainingQ.stats.mean}</strong>
-                          </div>
-                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
-                            <span style={{ color: '#64748b' }}>Mediana:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_training }}>{trainingQ.stats.median}</strong>
-                          </div>
-                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
-                            <span style={{ color: '#64748b' }}>Moda:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_training }}>{trainingQ.stats.mode}</strong>
-                          </div>
-                          <div style={{ padding: '0.5rem', backgroundColor: '#fff', borderRadius: '4px' }}>
-                            <span style={{ color: '#64748b' }}>Dev. Std:</span> <strong style={{ color: RESPONDENT_COLORS.teachers_training }}>{trainingQ.stats.std_dev}</strong>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
                   <TeacherComparisonBoxPlot
                     activeData={activeQ}
                     trainingData={trainingQ}
