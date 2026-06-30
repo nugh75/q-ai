@@ -3,57 +3,36 @@
 <!-- ai4educ:context-template v1.0 -->
 
 ## Quick Reference
-- **Stack**: {{backend_framework}}, {{frontend_framework}}, {{database}}, {{infra}}
-- **Entry point**: {{how_to_start_dev}}
-- **Test**: {{how_to_run_tests}}
-- **Repo**: {{repo_url}}
+- **Stack**: Python (FastAPI), React (Vite), PostgreSQL, Docker
+- **Entry point**: `docker compose up -d` o `uvicorn backend.app.main:app --reload` + `cd frontend && npm run dev`
+- **Test**: manuale / pytest
+- **Repo**: https://github.com/nugh75/q-ai
 
 ## Domain
-{{brief_description_3_5_sentences}}
-
-### Core Concepts
-- **{{Entity1}}**: {{brief_definition}}
-- **{{Entity2}}**: {{brief_definition}}
-
-### User Roles
-- **{{Role1}}**: {{what_they_can_do}}
-- **{{Role2}}**: {{what_they_can_do}}
+Sistema per l'analisi di questionari su studenti e insegnanti riguardo l'uso dell'IA in ambito educativo (progetto CNR). Carica file Excel, esegue analisi statistiche descrittive e comparative, analisi qualitativa con categorizzazione automatica.
 
 ## Architecture
-{{architectural_pattern_if_relevant}}
-
-### Key Directories
-```
-backend/
-  routes/       — API endpoints
-  ...
-frontend/
-  src/
-    app/        — Next.js App Router pages
-    components/ — React components
-    lib/        — shared utilities, types, i18n
-  ...
-```
+Monorepo backend/frontend:
+- Backend FastAPI: parsing Excel, analytics, statistics, qualitative templates
+- Frontend React (Vite): dashboard interattiva con grafici
+- PostgreSQL per archiviazione strutturata
 
 ### Key Files
-- `{{path}}` — {{what_it_contains_why_important}}
-- `{{path}}` — {{what_it_contains_why_important}}
-
-### Data Model (essential)
-{{key_tables_or_collections_with_relationships}}
+- `backend/app/main.py` — entry point API REST
+- `backend/app/excel_parser.py` — parsing file Excel
+- `backend/app/analytics.py` — analisi statistiche
+- `backend/app/qualitative_service.py` — analisi qualitativa con template
+- `backend/app/models.py` — modelli DB (SQLAlchemy)
+- `backend/app/database.py` — configurazione PostgreSQL
 
 ## Conventions
-- {{convention_1}}
-- {{convention_2}}
+- API REST con route versionate
+- Analisi qualitative: template-driven con categorizzazione automatica
 
 ## Common Tasks
 
-| Task | Command / Procedure |
+| Task | Command |
 |---|---|
-| Avvio locale | `{{command}}` |
-| Test | `{{command}}` |
-| Seed DB | `{{command}}` |
-| {{task_4}} | {{how_to}} |
-
-## ADRs / Decisions
-{{link_to_adr_directory_or_key_decisions}}
+| Avvio Docker | `docker compose up -d` |
+| Backend dev | `uvicorn backend.app.main:app --reload` |
+| Frontend dev | `cd frontend && npm run dev` |
